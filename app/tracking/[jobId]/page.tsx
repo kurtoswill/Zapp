@@ -263,16 +263,31 @@ export default function TrackingPage() {
 
   useEffect(() => {
     if (status !== "on_the_way") return;
-    const TOTAL = WORKER.eta;
+
+    const TOTAL       = WORKER.eta;           // 20 visual minutes
+    const TOTAL_MS    = 20_000;               // 20 s real time (demo)
+    const TICK_MS     = TOTAL_MS / TOTAL;     // 1 s per visual minute
+
     let cur = 0;
+
+    // Countdown tick — updates progress bar + ETA display
     const tick = setInterval(() => {
       cur++;
       setProgress(Math.min((cur / TOTAL) * 100, 100));
       setEtaRemaining(Math.max(TOTAL - cur, 0));
-      if (cur >= TOTAL) clearInterval(tick);
-    }, 4000);
-    return () => clearInterval(tick);
-  }, [status]);
+    }, TICK_MS);
+
+    // Hard deadline — redirect exactly when time is up
+    const done = setTimeout(() => {
+      clearInterval(tick);
+      router.push("/working/job-001");
+    }, TOTAL_MS);
+
+    return () => {
+      clearInterval(tick);
+      clearTimeout(done);
+    };
+  }, [status, router]);
 
   const isLate = elapsed >= WARN_AFTER_S && status === "waiting";
 
@@ -391,6 +406,11 @@ export default function TrackingPage() {
 
         {/* Row 1: Rate + ETA + status label */}
         <div className={styles.stickyTopRow}>
+          {/* Rate pill */}
+          <div className={styles.ratePill}>
+            <span className={styles.rateCurrency}>{WORKER.currency}</span>
+            <span className={styles.rateValue}>{WORKER.rate.toLocaleString()}</span>
+          </div>
 
           {/* Status + ETA */}
           <div className={styles.statusBlock}>

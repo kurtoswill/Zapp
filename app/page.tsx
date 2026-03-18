@@ -1,22 +1,22 @@
 "use client";
 
-import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
+import ServiceChip from "@/components/ServiceChip/ServiceChip";
+import type { LucideIcon } from "lucide-react";
 import {
-  MapPin,
   ChevronDown,
-  SlidersHorizontal,
   CloudUpload,
-  X,
-  Wrench,
-  Zap,
   Heart,
   HelpCircle,
+  MapPin,
   Paintbrush,
+  SlidersHorizontal,
   Truck,
+  Wrench,
+  X,
+  Zap,
 } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
-import ServiceChip from "@/components/ServiceChip/ServiceChip";
+import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 import styles from "./page.module.css";
 
 /* ------------------------------------------------------------------ */
@@ -28,11 +28,11 @@ interface Service {
 }
 
 const SERVICES: Service[] = [
-  { label: "Plumber",      icon: Wrench     },
-  { label: "Electrician",  icon: Zap        },
-  { label: "Caregiver",    icon: Heart      },
-  { label: "Painter",      icon: Paintbrush },
-  { label: "Mover",        icon: Truck      },
+  { label: "Plumber", icon: Wrench },
+  { label: "Electrician", icon: Zap },
+  { label: "Caregiver", icon: Heart },
+  { label: "Painter", icon: Paintbrush },
+  { label: "Mover", icon: Truck },
   { label: "Not sure yet", icon: HelpCircle },
 ];
 
@@ -48,12 +48,12 @@ interface UploadedFile {
 /*  Page                                                                */
 /* ================================================================== */
 export default function LandingPage() {
-  const [query, setQuery]             = useState("");
+  const [query, setQuery] = useState("");
   const [description, setDescription] = useState("");
-  const [files, setFiles]             = useState<UploadedFile[]>([]);
-  const [dragging, setDragging]       = useState(false);
-  const fileInputRef                  = useRef<HTMLInputElement>(null);
-  const router                        = useRouter();
+  const [files, setFiles] = useState<UploadedFile[]>([]);
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
 
   /* ---- File helpers ---- */
   const addFiles = (incoming: FileList | null) => {
@@ -89,7 +89,7 @@ export default function LandingPage() {
 
       {/* ── Hero ─────────────────────────────────────────────────── */}
       <section className={styles.hero}>
-        <div className={styles.heroGlow}  aria-hidden />
+        <div className={styles.heroGlow} aria-hidden />
         <div className={styles.heroGlow2} aria-hidden />
 
         {/* Top bar */}
@@ -135,21 +135,21 @@ export default function LandingPage() {
 
         {/* ── Service chips ── */}
         <div className={styles.chipsWrapper}>
-        <div
-          className={styles.chipsScroll}
-          role="group"
-          aria-label="Quick service selection"
-        >
-          {SERVICES.map((s) => (
-            <ServiceChip
-              key={s.label}
-              label={s.label}
-              icon={s.icon}
-              selected={query === s.label}
-              onClick={handleChipClick}
-            />
-          ))}
-        </div>
+          <div
+            className={styles.chipsScroll}
+            role="group"
+            aria-label="Quick service selection"
+          >
+            {SERVICES.map((s) => (
+              <ServiceChip
+                key={s.label}
+                label={s.label}
+                icon={s.icon}
+                selected={query === s.label}
+                onClick={handleChipClick}
+              />
+            ))}
+          </div>
         </div>
 
         {/* Describe */}
