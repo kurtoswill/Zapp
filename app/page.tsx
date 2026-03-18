@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import {
   MapPin,
   ChevronDown,
@@ -52,6 +53,7 @@ export default function LandingPage() {
   const [files, setFiles]             = useState<UploadedFile[]>([]);
   const [dragging, setDragging]       = useState(false);
   const fileInputRef                  = useRef<HTMLInputElement>(null);
+  const router                        = useRouter();
 
   /* ---- File helpers ---- */
   const addFiles = (incoming: FileList | null) => {
@@ -108,7 +110,7 @@ export default function LandingPage() {
         {/* Headline */}
         <div className={styles.heroText}>
           <h1 className={styles.headline}>
-            Need someone?<br />Get them fast.
+            Fix anything.<br />Fast.
           </h1>
         </div>
       </section>
@@ -210,7 +212,7 @@ export default function LandingPage() {
         </div>
 
         {/* Primary CTA */}
-        <button className={styles.ctaPrimary}>
+        <button className={styles.ctaPrimary} onClick={() => router.push("/worker-001")}>
           Find a worker
         </button>
 

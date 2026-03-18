@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Zap,
@@ -28,7 +29,6 @@ const WORKER = {
   reviews:   203,
   rate:      500,
   currency:  "₱",
-  eta:       20,
   area:      "Green Valley Field Subdivision",
   distance:  "6 km",
   certified: "TESDA Certified",
@@ -75,6 +75,7 @@ const REVIEWS: Review[] = [
 /* ================================================================== */
 export default function WorkerProfilePage() {
   const [selectedPayment, setSelectedPayment] = useState<PaymentId>("cod");
+  const router = useRouter();
 
   return (
     <div className={styles.page}>
@@ -112,24 +113,14 @@ export default function WorkerProfilePage() {
 
           <div className={styles.divider} />
 
-          {/* ── ETA + Location ── */}
-          <section className={styles.etaSection}>
-            {/* ETA — primary, large */}
-            <div className={styles.etaPrimary}>
-              <span className={styles.etaValue}>{WORKER.eta}</span>
-              <span className={styles.etaUnit}>min</span>
-            </div>
-
-            {/* Location + distance — secondary */}
-            <div className={styles.etaDetails}>
-              <div className={styles.etaDetailRow}>
-                <MapPin size={13} strokeWidth={2} className={styles.etaIcon} />
-                <span className={styles.etaDetailPrimary}>{WORKER.area}</span>
-              </div>
-              <div className={styles.etaDetailRow}>
-                <Navigation size={13} strokeWidth={2} className={styles.etaIcon} />
-                <span className={styles.etaDetailSecondary}>{WORKER.distance} away</span>
-              </div>
+          {/* ── Distance + Location ── */}
+          <section className={styles.locationSection}>
+            <div className={styles.locationRow}>
+              <Navigation size={15} strokeWidth={2.2} className={styles.locationIcon} />
+              <span className={styles.locationDistance}>{WORKER.distance}</span>
+              <span className={styles.locationSep}>·</span>
+              <MapPin size={14} strokeWidth={2} className={styles.locationIcon} />
+              <span className={styles.locationArea}>{WORKER.area}</span>
             </div>
           </section>
 
@@ -202,7 +193,7 @@ export default function WorkerProfilePage() {
 
           {/* ── Reviews ── */}
           <section className={styles.section}>
-            <h2 className={styles.sectionTitle}>Customer Reviews</h2>
+            <h2 className={styles.sectionTitle}>Worker Reviews</h2>
             <div className={styles.reviewsList}>
               {REVIEWS.map((r) => (
                 <ReviewCard key={r.id} review={r} />
@@ -215,7 +206,7 @@ export default function WorkerProfilePage() {
       </main>
 
       {/* ── Sticky bottom bar (component) ───────────────────────── */}
-      <WorkerBottomBar />
+      <WorkerBottomBar onChoose={() => router.push("/tracking/job-001")} />
 
     </div>
   );

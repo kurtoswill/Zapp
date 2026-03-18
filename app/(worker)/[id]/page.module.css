@@ -160,71 +160,50 @@
 }
 
 /* ----------------------------------------------------------------
-   ETA + Location — UI/UX hierarchy
-   Primary:   big ETA number (the most important info)
-   Secondary: location name (where)
-   Tertiary:  distance (supporting detail, muted)
+   Distance + Location — single compact row
    ---------------------------------------------------------------- */
-.etaSection {
-  display: flex;
-  align-items: center;
-  gap: var(--space-5);
+.locationSection {
+  /* sits between identity and badges, no extra margin needed */
 }
 
-/* ETA — the dominant focal point */
-.etaPrimary {
+.locationRow {
   display: flex;
-  align-items: baseline;
-  gap: 3px;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: nowrap;
+  overflow: hidden;
+}
+
+.locationIcon {
+  color: var(--color-text-secondary);
   flex-shrink: 0;
 }
 
-.etaValue {
-  font-size: 2.5rem;         /* larger than h2 — stands out intentionally */
-  line-height: 1;
-  font-weight: 800;
+/* Distance — primary weight, stands out */
+.locationDistance {
+  font-size: var(--text-body-lg-size);
+  line-height: var(--text-body-lg-lh);
+  font-weight: 700;
   color: var(--color-text-primary);
-  letter-spacing: -0.03em;
+  white-space: nowrap;
 }
 
-.etaUnit {
-  font-size: var(--text-sm-size);
-  line-height: 1;
-  font-weight: 500;
+/* Dot separator */
+.locationSep {
+  font-size: var(--text-body-lg-size);
   color: var(--color-text-secondary);
-}
-
-/* Location + distance — secondary/tertiary */
-.etaDetails {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-
-.etaDetailRow {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.etaIcon {
   flex-shrink: 0;
-  color: var(--color-text-secondary);
 }
 
-/* Location name — secondary, readable */
-.etaDetailPrimary {
+/* Area — secondary, truncate if long */
+.locationArea {
   font-size: var(--text-sm-med-size);
   line-height: var(--text-sm-med-lh);
   font-weight: var(--text-sm-med-weight);
-  color: var(--color-text-primary);
-}
-
-/* Distance — tertiary, supporting detail */
-.etaDetailSecondary {
-  font-size: var(--text-xs-size);
-  line-height: var(--text-xs-lh);
   color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ----------------------------------------------------------------
