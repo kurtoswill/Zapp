@@ -1,0 +1,481 @@
+/* ================================================================
+   Zapp — Worker Profile Page
+   app/worker/[id]/page.module.css
+   ================================================================ */
+
+.page {
+  display: flex;
+  flex-direction: column;
+  height: 100svh;
+  background: var(--color-surface);
+  overflow: hidden;
+}
+
+/* ----------------------------------------------------------------
+   Scrollable area
+   ---------------------------------------------------------------- */
+.scrollArea {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.scrollArea::-webkit-scrollbar {
+  display: none;
+}
+
+/* ----------------------------------------------------------------
+   Hero image
+   ---------------------------------------------------------------- */
+.heroImage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  background: var(--color-ink);
+  overflow: hidden;
+}
+
+.heroImage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+}
+
+/* Gradient scrim */
+.heroImage::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(13, 23, 42, 0.45) 0%,
+    transparent 35%
+  );
+  pointer-events: none;
+}
+
+.heroNav {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  padding: calc(var(--safe-top) + var(--space-4)) var(--space-4) var(--space-4);
+}
+
+.iconBtn {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  background: rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.iconBtn:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+/* ----------------------------------------------------------------
+   Content card
+   ---------------------------------------------------------------- */
+.content {
+  background: var(--color-surface);
+  border-radius: var(--radius-2xl) var(--radius-2xl) 0 0;
+  margin-top: calc(-1 * var(--radius-2xl));
+  padding: var(--space-6) var(--space-5);
+  position: relative;
+  z-index: 1;
+}
+
+/* ----------------------------------------------------------------
+   Identity
+   ---------------------------------------------------------------- */
+.identity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.identityTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.name {
+  font-size: var(--text-h2-size);
+  line-height: var(--text-h2-lh);
+  font-weight: var(--text-h2-weight);
+  letter-spacing: -0.015em;
+  color: var(--color-text-primary);
+  flex: 1;
+}
+
+.rate {
+  font-size: var(--text-h2-size);
+  line-height: var(--text-h2-lh);
+  font-weight: var(--text-h2-weight);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.role {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm-med-size);
+  line-height: var(--text-sm-med-lh);
+  font-weight: var(--text-sm-med-weight);
+  color: var(--color-text-primary);
+  margin-top: var(--space-1);
+}
+
+.roleIcon {
+  color: var(--color-brand);
+  flex-shrink: 0;
+}
+
+/* ----------------------------------------------------------------
+   Divider
+   ---------------------------------------------------------------- */
+.divider {
+  height: 1px;
+  background: var(--color-border);
+  margin-block: var(--space-5);
+}
+
+/* ----------------------------------------------------------------
+   ETA + Location — UI/UX hierarchy
+   Primary:   big ETA number (the most important info)
+   Secondary: location name (where)
+   Tertiary:  distance (supporting detail, muted)
+   ---------------------------------------------------------------- */
+.etaSection {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+}
+
+/* ETA — the dominant focal point */
+.etaPrimary {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.etaValue {
+  font-size: 2.5rem;         /* larger than h2 — stands out intentionally */
+  line-height: 1;
+  font-weight: 800;
+  color: var(--color-text-primary);
+  letter-spacing: -0.03em;
+}
+
+.etaUnit {
+  font-size: var(--text-sm-size);
+  line-height: 1;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+/* Location + distance — secondary/tertiary */
+.etaDetails {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.etaDetailRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.etaIcon {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+
+/* Location name — secondary, readable */
+.etaDetailPrimary {
+  font-size: var(--text-sm-med-size);
+  line-height: var(--text-sm-med-lh);
+  font-weight: var(--text-sm-med-weight);
+  color: var(--color-text-primary);
+}
+
+/* Distance — tertiary, supporting detail */
+.etaDetailSecondary {
+  font-size: var(--text-xs-size);
+  line-height: var(--text-xs-lh);
+  color: var(--color-text-secondary);
+}
+
+/* ----------------------------------------------------------------
+   Badges
+   ---------------------------------------------------------------- */
+.badges {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+}
+
+.badge {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.badgeIconCertified { color: var(--color-brand); flex-shrink: 0; }
+.badgeCertified {
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-lh);
+  color: var(--color-brand);
+  font-weight: 500;
+}
+
+.badgeIconJobs { color: var(--color-text-secondary); flex-shrink: 0; }
+.badgeJobs {
+  font-size: var(--text-sm-size);
+  line-height: var(--text-sm-lh);
+  color: var(--color-text-secondary);
+}
+
+/* ----------------------------------------------------------------
+   Sections
+   ---------------------------------------------------------------- */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.sectionTitle {
+  font-size: var(--text-h3-size);
+  line-height: var(--text-h3-lh);
+  font-weight: var(--text-h3-weight);
+  letter-spacing: -0.01em;
+  color: var(--color-text-primary);
+}
+
+/* ----------------------------------------------------------------
+   Payment — compact
+   ---------------------------------------------------------------- */
+.paymentList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.paymentRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);   /* compact */
+  background: var(--color-surface-raised);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  font-family: var(--font-family);
+  text-align: left;
+  width: 100%;
+  transition: border-color var(--duration-fast) var(--ease-out),
+              background    var(--duration-fast) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.paymentRowSelected {
+  border-color: var(--color-brand);
+  background: var(--color-brand-20);
+}
+
+.paymentBadge {
+  width: 28px;                /* smaller badge */
+  height: 28px;
+  border-radius: var(--radius-xs);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.02em;
+  flex-shrink: 0;
+}
+
+.paymentLabel {
+  flex: 1;
+  font-size: var(--text-sm-med-size);       /* smaller than before */
+  line-height: var(--text-sm-med-lh);
+  font-weight: var(--text-sm-med-weight);
+  color: var(--color-text-primary);
+}
+
+.paymentSublabel {
+  color: var(--color-text-secondary);
+  font-weight: 400;
+}
+
+.paymentRadio {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  border: 2px solid var(--color-border);
+  flex-shrink: 0;
+  transition: border-color var(--duration-fast) var(--ease-out),
+              background    var(--duration-fast) var(--ease-out);
+}
+
+.paymentRadioSelected {
+  border-color: var(--color-brand);
+  background: var(--color-brand);
+  box-shadow: inset 0 0 0 3px var(--color-surface-raised);
+}
+
+.paymentAddRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-raised);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  font-family: var(--font-family);
+  text-align: left;
+  width: 100%;
+  transition: background     var(--duration-fast) var(--ease-out),
+              border-color   var(--duration-fast) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.paymentAddRow:hover {
+  border-color: var(--color-ink-40);
+  background: var(--color-surface-subtle);
+}
+
+.paymentAddIcon {
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-xs);
+  background: var(--color-surface-subtle);
+  border: 1.5px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--color-text-primary);
+}
+
+.chevron {
+  color: var(--color-text-secondary);
+  flex-shrink: 0;
+}
+
+.paymentFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: var(--space-1);
+}
+
+.paymentTags {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.paymentTag {
+  padding: 2px var(--space-2);
+  background: var(--color-surface-subtle);
+  border: 1.5px solid var(--color-border);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-xxs-size);
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.paymentTagIcon {
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-subtle);
+  border: 1.5px solid var(--color-border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: color       var(--duration-fast) var(--ease-out),
+              background  var(--duration-fast) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.paymentTagIcon:hover {
+  color: var(--color-error);
+  background: rgba(239, 68, 68, 0.08);
+}
+
+.viewAllBtn {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--text-xs-size);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: var(--font-family);
+  transition: color var(--duration-fast) var(--ease-out);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.viewAllBtn:hover { color: var(--color-brand); }
+
+/* ----------------------------------------------------------------
+   Reviews — clean, borderless (separator via ReviewCard itself)
+   ---------------------------------------------------------------- */
+.reviewsList {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ----------------------------------------------------------------
+   Bottom spacer
+   ---------------------------------------------------------------- */
+.bottomSpacer {
+  height: var(--space-6);
+}
+
+/* ================================================================
+   Responsive
+   ================================================================ */
+@media (min-width: 640px) {
+  .content    { padding-inline: var(--space-8); }
+  .heroImage  { aspect-ratio: 16 / 9; }
+}
+
+@media (min-width: 768px) {
+  .content   { padding-inline: clamp(var(--space-8), 8vw, 10rem); }
+  .heroImage { aspect-ratio: 21 / 9; }
+  .name      { font-size: var(--text-h1-size); line-height: var(--text-h1-lh); }
+}

@@ -1,0 +1,55 @@
+/* StarRating.module.css */
+
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.value {
+  font-size: var(--text-sm-med-size);
+  line-height: 1;
+  font-weight: var(--text-sm-med-weight);
+  color: var(--color-text-primary);
+}
+
+.stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+}
+
+.starWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.starEmpty {
+  display: block;
+  color: #E2C96B;
+  opacity: 0.3;
+}
+
+/* Filled layer sits on top, clipped to the fill % */
+.starFilled {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+
+.starFilled svg {
+  fill: #E2C96B;
+  color: #E2C96B;
+  flex-shrink: 0;
+}
+
+.count {
+  font-size: var(--text-xs-size);
+  line-height: 1;
+  color: var(--color-text-secondary);
+}
