@@ -17,7 +17,7 @@ const manrope = Manrope({
 /* ------------------------------------------------------------------ */
 export const metadata: Metadata = {
   title: {
-    default: "Beavr — Fix anything. Fast.",
+    default: "Beavr — Built for you. Done fast.",
     template: "%s | Beavr",
   },
   description:
@@ -30,13 +30,13 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     siteName: "Beavr",
-    title: "Beavr — Fix anything. Fast.",
+    title: "Beavr — Built for you. Done fast.",
     description:
       "On-demand local services. Connect with nearby skilled workers in real time.",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Beavr — Fix anything. Fast.",
+    title: "Beavr — Built for you. Done fast.",
     description:
       "On-demand local services. Connect with nearby skilled workers in real time.",
   },

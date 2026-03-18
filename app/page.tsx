@@ -116,7 +116,7 @@ export default function LandingPage() {
         {/* Headline */}
         <div className={styles.heroText}>
           <h1 className={styles.headline}>
-            Fix anything.<br />Fast.
+            Built for you.<br />Done fast.
           </h1>
         </div>
       </section>
