@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useRef } from "react";
+import Image from "next/image";
+import { useState, useRef, } from "react";
 import { useRouter } from "next/navigation";
 import {
   MapPin,
@@ -107,7 +108,7 @@ export default function LandingPage() {
         {/* Top bar */}
         <header className={styles.topBar}>
           <div className={styles.avatar}>
-            <img src="https://i.pravatar.cc/80?img=47" alt="User avatar" />
+            <Image src="https://i.pravatar.cc/80?img=47" alt="User avatar" width={80} height={80} />
           </div>
           <button className={styles.locationPill} aria-label="Change location">
             <span className={styles.locationLabel}>Your location</span>
@@ -218,7 +219,7 @@ export default function LandingPage() {
             <div className={styles.uploadPreviews}>
               {files.map((f, i) => (
                 <div key={i} className={styles.previewThumb}>
-                  <img src={f.preview} alt={f.name} />
+                  <Image src={f.preview} alt={f.name} />
                   <button
                     className={styles.previewRemove}
                     aria-label={`Remove ${f.name}`}

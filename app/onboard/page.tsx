@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -8,11 +9,13 @@ import {
   MapPin,
   Check,
   X,
-  FileText,
-  Award,
   BadgeCheck,
 } from "lucide-react";
 import styles from "./page.module.css";
+
+const LeafletPinMap = dynamic(() => import("./LeafletMap").then((mod) => mod.LeafletPinMap), {
+  ssr: false,
+});
 
 /* ================================================================== */
 /*  Data                                                                */
@@ -22,32 +25,13 @@ const TOTAL_STEPS = 5; // Step 5 = Verify
 /* ---- Region: CALABARZON only ---- */
 const REGION = "CALABARZON (Region IV-A)";
 
-const PROVINCES = ["Batangas", "Cavite", "Laguna", "Quezon", "Rizal"];
+interface PSGCItem { code: string; name: string; }
 
-const CITIES: Record<string, string[]> = {
-  Batangas: ["Agoncillo","Alitagtag","Balayan","Balete","Batangas City","Bauan","Calaca","Calatagan","Cuenca","Ibaan","Laurel","Lemery","Lian","Lipa City","Lobo","Mabini","Malvar","Mataas na Kahoy","Nasugbu","Padre Garcia","Rosario","San Jose","San Juan","San Luis","San Nicolas","San Pascual","Santa Teresita","Santo Tomas","Taal","Talisay","Taysan","Tingloy","Tuy"],
-  Cavite: ["Alfonso","Amadeo","Bacoor","Carmona","Cavite City","Dasmariñas","General Emilio Aguinaldo","General Mariano Alvarez","General Trias","Imus","Indang","Kawit","Magallanes","Maragondon","Mendez","Naic","Noveleta","Rosario","Silang","Tagaytay","Tanza","Ternate","Trece Martires"],
-  Laguna: ["Alaminos","Bay","Biñan","Cabuyao","Calamba","Cavinti","Famy","Kalayaan","Liliw","Los Baños","Luisiana","Lumban","Mabitac","Magdalena","Majayjay","Nagcarlan","Paete","Pagsanjan","Pakil","Pangil","Pila","Rizal","San Pablo","San Pedro","Santa Cruz","Santa Maria","Santa Rosa","Siniloan","Victoria"],
-  Quezon: ["Agdangan","Alabat","Atimonan","Buenavista","Burdeos","Calauag","Candelaria","Catanauan","Dolores","General Luna","General Nakar","Guinayangan","Gumaca","Infanta","Jomalig","Lopez","Lucban","Lucena City","Macalelon","Mauban","Mulanay","Padre Burgos","Pagbilao","Panukulan","Patnanungan","Perez","Pitogo","Plaridel","Polillo","Quezon","Real","Sampaloc","San Andres","San Antonio","San Francisco","San Narciso","Sariaya","Tagkawayan","Tayabas","Tiaong","Unisan"],
-  Rizal: ["Angono","Antipolo","Baras","Binangonan","Cainta","Cardona","Jalajala","Morong","Pililla","Rodriguez","San Mateo","Tanay","Taytay","Teresa"],
-};
-
-const BARANGAYS: Record<string, string[]> = {
-  /* Cavite - Indang */
-  Indang: ["Agus-os","Alulod","Banaba Cerca","Banaba Lejos","Bancod","Bancod Sur","Biluso","Carasuchi","Guyam Malaki","Guyam Munti","Harasan","Kayquit I","Kayquit II","Kayquit III","Kaytambog","Limbon","Lumampong Balagbag","Lumampong Hagdang","Mabunga","Mataas na Lupa","Pulo","Tambo Balagbag","Tambo Kulit","Tambo Malaki","Toclong I","Toclong II"],
-  /* Cavite - Dasmariñas */
-  "Dasmariñas": ["Burol I","Burol II","Burol III","Emmanuel Bergado I","Emmanuel Bergado II","Fatima I","Fatima II","Fatima III","Langkaan I","Langkaan II","Luzviminda I","Luzviminda II","Paliparan I","Paliparan II","Paliparan III","Sabang","Salawag","Salitran I","Salitran II","Salitran III","Salitran IV","Sampaloc I","Sampaloc II","Sampaloc III","Sampaloc IV","San Agustin I","San Agustin II","San Agustin III","Zone I","Zone II","Zone III","Zone IV"],
-  /* Batangas City */
-  "Batangas City": ["Alangilan","Balagtas","Balete","Banaba Center","Banaba East","Banaba West","Banaba South","Bilogo","Bolbok","Bukal","Calicanto","Catandala","Concepcion","Convergys","Cuta","Dalig","Dela Paz","Dela Paz Proper","Domoit","Gulod Itaas","Gulod Labac","Kumintang Ibaba","Kumintang Ilaya","Libjo","Liponpon","Maapaz","Mahabang Dahilig","Mahabang Parang","Mahayaw","Malibayo","Malitam","Maruclap","Mabacong","Pagkilatan","Paharang East","Paharang West","Pallocan East","Pallocan West","Pinamucan","Pinamucan East","Pinamucan West","Sampaga","San Agapito","San Agustin Kanluran","San Agustin Silangan","San Andres","San Antonio","San Isidro","San Jose Sico","San Miguel","San Pedro","Simlong","Sirang Lupa","Sorosoro Ibaba","Sorosoro Ilaya","Sorosoro Karsada","Tabangao","Talahib Pandayan","Talahib Payapa","Talumpok East","Talumpok West","Tulo","Wawa"],
-  /* Laguna - Calamba */
-  Calamba: ["Bagong Kalsada","Banadero","Banlic","Barandal","Batino","Bubuyan","Bucal","Bunggo","Burol","Camaligan","Canlubang","Halang","Hornalan","Kay-anlog","La Mesa","Laguerta","Lawa","Lecheria","Lingga","Looc","Mabato","Makiling","Mapagong","Masili","Maunong","Mayapa","Milagrosa","Paciano Rizal","Palingon","Palo-Alto","Pansol","Parian","Prinza","Punta","Puting Lupa","Real","Saimsim","Sampiruhan","San Cristobal","San Jose","San Juan","Sirang Lupa","Sucol","Turbina","Ulango","Uwisan"],
-  /* Laguna - Los Baños */
-  "Los Baños": ["Anos","Bagong Silang","Bambang","Batong Malake","Baybayin","Bayog","Lalakay","Maahas","Malinta","Mayondon","Putho-Tuntungin","San Antonio","Tadlak","Timugan"],
-};
+const PSGC_BASE = "https://psgc.gitlab.io/api";
 
 const ROLES_PRESET = ["Electrician","Plumber","Caregiver","Painter","Carpenter","HVAC Technician","Welder","Mason","Mover","General Handyman"];
-const YEARS_EXP    = ["Less than 1 year","1–2 years","3–5 years","More than 5 years"];
-const ID_TYPES     = ["Driver's License","National ID (PhilSys)","Passport"];
+const YEARS_EXP = ["Less than 1 year","1–2 years","3–5 years","More than 5 years"];
+const ID_TYPES = ["Driver's License","National ID (PhilSys)","Passport"];
 
 /* ================================================================== */
 /*  Types                                                               */
@@ -57,7 +41,8 @@ interface UploadSlot { file: File | null; preview: string | null; }
 interface FormData {
   firstName: string; middleInitial: string; lastName: string; birthday: string;
   email: string; phone: string;
-  province: string; city: string; barangay: string; street: string;
+  region: string; regionCode: string; province: string; provinceCode: string; city: string; cityCode: string; barangay: string; barangayCode: string; street: string;
+  latitude: string; longitude: string;
   role: string; roleCustom: string; yearsExp: string;
   idType: string; idFront: UploadSlot; idBack: UploadSlot; selfie: UploadSlot;
   licenseImg: UploadSlot; certificateImg: UploadSlot;
@@ -70,7 +55,8 @@ const EMPTY_SLOT: UploadSlot = { file: null, preview: null };
 const EMPTY: FormData = {
   firstName: "", middleInitial: "", lastName: "", birthday: "",
   email: "", phone: "",
-  province: "", city: "", barangay: "", street: "",
+  region: "", regionCode: "", province: "", provinceCode: "", city: "", cityCode: "", barangay: "", barangayCode: "", street: "",
+  latitude: "", longitude: "",
   role: "", roleCustom: "", yearsExp: "",
   idType: "", idFront: EMPTY_SLOT, idBack: EMPTY_SLOT, selfie: EMPTY_SLOT,
   licenseImg: EMPTY_SLOT, certificateImg: EMPTY_SLOT,
@@ -122,7 +108,7 @@ function Input({ label, value, onChange, placeholder, type = "text", required, e
 
 function SelectField({ label, value, onChange, options, placeholder, required, error, disabled }: {
   label: string; value: string; onChange: (v: string) => void;
-  options: string[]; placeholder?: string; required?: boolean; error?: string; disabled?: boolean;
+  options: Array<string | { value: string; label: string }>; placeholder?: string; required?: boolean; error?: string; disabled?: boolean;
 }) {
   return (
     <div className={styles.fieldGroup}>
@@ -136,7 +122,10 @@ function SelectField({ label, value, onChange, options, placeholder, required, e
           aria-label={label}
         >
           <option value="">{placeholder ?? `Select ${label}`}</option>
-          {options.map((o) => <option key={o} value={o}>{o}</option>)}
+          {options.map((o) => {
+            if (typeof o === "string") return <option key={o} value={o}>{o}</option>;
+            return <option key={o.value} value={o.value}>{o.label}</option>;
+          })}
         </select>
         <ChevronDown size={15} strokeWidth={2} className={styles.selectChevron} />
       </div>
@@ -184,26 +173,30 @@ function UploadBox({ label, sublabel, slot, onChange, error }: {
   );
 }
 
-/* ================================================================== */
-/*  Fake pin map                                                        */
-/* ================================================================== */
-function PinMap() {
+function PinMap({ center, coords, onCoordsChange }: { center?: string; coords?: { lat: number; lon: number }; onCoordsChange: (lat: number, lon: number) => void }) {
+  const fallback = { lat: 14.2819, lon: 120.9106 }; // Cavite southern Luzon
+  const current = coords || fallback;
+  const info = center || "Cavite State University";
+
+  const bounds = `${current.lon - 0.02},${current.lat - 0.02},${current.lon + 0.02},${current.lat + 0.02}`;
+
   return (
-    <div className={styles.pinMapWrap}>
-      <div className={styles.pinMapBg} />
-      <svg className={styles.pinMapRoads} viewBox="0 0 320 160" aria-hidden>
-        <line x1="0" y1="80" x2="320" y2="95"  stroke="#4a5568" strokeWidth="5" />
-        <line x1="160" y1="0" x2="168" y2="160" stroke="#4a5568" strokeWidth="4" />
-        <line x1="0" y1="40" x2="320" y2="48"  stroke="#374151" strokeWidth="2" opacity="0.5" />
-        <line x1="0" y1="130" x2="320" y2="138" stroke="#374151" strokeWidth="2" opacity="0.5" />
-        <line x1="80"  y1="0" x2="82"  y2="160" stroke="#374151" strokeWidth="2" opacity="0.4" />
-        <line x1="250" y1="0" x2="252" y2="160" stroke="#374151" strokeWidth="2" opacity="0.4" />
-        <text x="172" y="56" fill="#6b7280" fontSize="8" fontFamily="sans-serif">Cavite State University</text>
-        <text x="12"  y="130" fill="#6b7280" fontSize="8" fontFamily="sans-serif">Indang</text>
-      </svg>
-      <div className={styles.pinMarker}>
-        <MapPin size={22} strokeWidth={2} className={styles.pinIcon} />
-      </div>
+    <div className={styles.pinMapWrap} style={{ minHeight: "240px" }}>
+      {typeof window !== "undefined" ? (
+        <LeafletPinMap current={current} onCoordsChange={onCoordsChange} />
+      ) : (
+        <>
+          <iframe
+            title="Current location map"
+            src={`https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bounds)}&layer=mapnik&marker=${current.lat}%2C${current.lon}`}
+            style={{ border: 0, width: "100%", height: "180px" }}
+            loading="lazy"
+          />
+          <div className={styles.pinMapLabel}>
+            {info} • lat: {current.lat.toFixed(6)}, lon: {current.lon.toFixed(6)}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -218,7 +211,7 @@ function Step1({ data, errors, on }: { data: FormData; errors: FieldErrors; on: 
       <Input label="First name"     value={data.firstName}     onChange={(v) => on("firstName", v)}     placeholder="ex. Kazel Arwen Jane"  required error={errors.firstName} />
       <Input label="Middle Initial" value={data.middleInitial} onChange={(v) => on("middleInitial", v)} placeholder="ex. L"                  required error={errors.middleInitial} />
       <Input label="Last name"      value={data.lastName}      onChange={(v) => on("lastName", v)}      placeholder="ex. Tuazon"             required error={errors.lastName} />
-      <Input label="Birthday"       value={data.birthday}      onChange={(v) => on("birthday", v)}      placeholder="MM/DD/YYYY"             required error={errors.birthday} />
+      <Input label="Birthday"       value={data.birthday}      onChange={(v) => on("birthday", v)}      type="date" placeholder="YYYY-MM-DD"             required error={errors.birthday} />
 
       <h2 className={`${styles.sectionTitle} ${styles.mt}`}>Contact Information</h2>
       <Input label="Email"        value={data.email} onChange={(v) => on("email", v)} placeholder="@example.com" type="email" required error={errors.email} />
@@ -230,40 +223,65 @@ function Step1({ data, errors, on }: { data: FormData; errors: FieldErrors; on: 
 /* ================================================================== */
 /*  Step 2 — Address                                                    */
 /* ================================================================== */
-function Step2({ data, errors, on }: { data: FormData; errors: FieldErrors; on: (k: keyof FormData, v: string) => void }) {
-  const cities    = data.province ? (CITIES[data.province]    ?? []) : [];
-  const barangays = data.city     ? (BARANGAYS[data.city]     ?? []) : [];
-
+function Step2({ data, errors, onField, onRegion, onProvince, onCity, onBarangay, regions, provinces, municipalities, barangays, mapLabel, mapCoords, onCoordsChange }: {
+  data: FormData; errors: FieldErrors;
+  onField: (k: keyof FormData, v: string) => void;
+  onRegion: (code: string, name: string) => void;
+  onProvince: (code: string, name: string) => void;
+  onCity: (code: string, name: string) => void;
+  onBarangay: (code: string, name: string) => void;
+  regions: PSGCItem[];
+  provinces: PSGCItem[];
+  municipalities: PSGCItem[];
+  barangays: PSGCItem[];
+  mapLabel: string;
+  mapCoords: { lat: number; lon: number } | null;
+  onCoordsChange: (lat: number, lon: number) => void;
+}) {
   return (
     <>
       <h2 className={styles.sectionTitle}>Address</h2>
 
       {/* Region — locked */}
-      <div className={styles.fieldGroup}>
-        <FieldLabel label="Region" required />
-        <div className={styles.lockedField}>
-          <span>{REGION}</span>
-        </div>
-      </div>
+      <SelectField label="Region" value={data.regionCode}
+        onChange={(value) => {
+          const selected = regions.find((r: PSGCItem) => r.code === value);
+          if (value && selected) onRegion(value, selected.name);
+        }}
+        options={regions.map((r: PSGCItem) => ({ value: r.code, label: r.name }))}
+        placeholder="Select Region"
+        required error={errors.region} />
 
-      <SelectField label="Province" value={data.province}
-        onChange={(v) => { on("province", v); on("city", ""); on("barangay", ""); }}
-        options={PROVINCES} required error={errors.province} />
+      <SelectField label="Province" value={data.provinceCode}
+        onChange={(value) => {
+          const selected = provinces.find((p: PSGCItem) => p.code === value);
+          onProvince(value, selected?.name ?? "");
+        }}
+        options={provinces.map((p: PSGCItem) => ({ value: p.code, label: p.name }))}
+        required error={errors.province} />
 
-      <SelectField label="City / Municipality" value={data.city}
-        onChange={(v) => { on("city", v); on("barangay", ""); }}
-        options={cities} required error={errors.city} disabled={!data.province} />
+      <SelectField label="City / Municipality" value={data.cityCode}
+        onChange={(value) => {
+          const selected = municipalities.find((m: PSGCItem) => m.code === value);
+          onCity(value, selected?.name ?? "");
+        }}
+        options={municipalities.map((m: PSGCItem) => ({ value: m.code, label: m.name }))}
+        required error={errors.city} disabled={!data.provinceCode} />
 
-      <SelectField label="Barangay" value={data.barangay}
-        onChange={(v) => on("barangay", v)}
-        options={barangays} required error={errors.barangay} disabled={!data.city} />
+      <SelectField label="Barangay" value={data.barangayCode}
+        onChange={(value) => {
+          const selected = barangays.find((b: PSGCItem) => b.code === value);
+          onBarangay(value, selected?.name ?? "");
+        }}
+        options={barangays.map((b: PSGCItem) => ({ value: b.code, label: b.name }))}
+        required error={errors.barangay} disabled={!data.cityCode} />
 
       <Input label="Street Name, Building, House No." value={data.street}
-        onChange={(v) => on("street", v)} required error={errors.street} />
+        onChange={(v) => onField("street", v)} required error={errors.street} />
 
       <div className={styles.fieldGroup}>
         <FieldLabel label="Pin Location" />
-        <PinMap />
+        <PinMap center={mapLabel} coords={mapCoords || undefined} onCoordsChange={onCoordsChange} />
       </div>
     </>
   );
@@ -412,6 +430,126 @@ export default function OnboardPage() {
   const [data, setData]   = useState<FormData>(EMPTY);
   const [errors, setErrors] = useState<FieldErrors>({});
 
+  const [regions, setRegions] = useState<PSGCItem[]>([]);
+  const [provinces, setProvinces] = useState<PSGCItem[]>([]);
+  const [municipalities, setMunicipalities] = useState<PSGCItem[]>([]);
+  const [barangays, setBarangays] = useState<PSGCItem[]>([]);
+  const [mapCoords, setMapCoords] = useState<{ lat: number; lon: number } | null>(null);
+  const [mapLabel, setMapLabel] = useState<string>("");
+
+  const fetchPSGCResource = async (level: string, code?: string) => {
+    const params = new URLSearchParams({ level });
+    if (code) params.set("code", code);
+
+    try {
+      const res = await fetch(`/api/psgc?${params.toString()}`);
+      if (!res.ok) throw new Error(`PSGC proxy error ${res.status}`);
+      const raw = await res.json();
+      const list = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw?.value)
+          ? raw.value
+          : [];
+
+      return list.map((item: { code: string; name: string }) => ({ code: item.code, name: item.name }));
+    } catch (err) {
+      console.error("PSGC fetch failed:", err);
+      return [];
+    }
+  };
+
+  useEffect(() => {
+    (async () => {
+      const list = await fetchPSGCResource("regions");
+      setRegions(list);
+      // default region if no choice yet
+      if (list.length > 0 && !data.regionCode) {
+        const calabarzon = list.find((r) => r.name.toLowerCase().includes("calabarzon") || r.code === "040000000");
+        if (calabarzon) {
+          onRegionSelect(calabarzon.code, calabarzon.name);
+          return;
+        }
+      }
+    })();
+  }, []);
+
+  const updateCoordinates = (lat: number, lon: number) => {
+    setMapCoords({ lat, lon });
+    setData((d) => ({ ...d, latitude: lat.toString(), longitude: lon.toString() }));
+  };
+
+  useEffect(() => {
+    const address = [data.street, data.barangay, data.city, data.province, data.region]
+      .filter(Boolean)
+      .join(", ");
+
+    setMapLabel(address || "Cavite State University");
+
+    if (!address) {
+      setMapCoords(null);
+      setData((d) => ({ ...d, latitude: "", longitude: "" }));
+      return;
+    }
+
+    const controller = new AbortController();
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
+
+    fetch(url, { signal: controller.signal, headers: { "Accept-Language": "en" } })
+      .then((res) => res.json())
+      .then((items) => {
+        if (items && items[0] && items[0].lat && items[0].lon) {
+          updateCoordinates(parseFloat(items[0].lat), parseFloat(items[0].lon));
+        }
+      })
+      .catch((err) => {
+        if (err.name !== "AbortError") console.warn("Geocoding failed", err);
+      });
+
+    return () => controller.abort();
+  }, [data.street, data.barangay, data.city, data.province, data.region]);
+
+  useEffect(() => {
+    if (!data.regionCode) {
+      setProvinces([]);
+      setMunicipalities([]);
+      setBarangays([]);
+      return;
+    }
+
+    (async () => {
+      const list = await fetchPSGCResource("provinces", data.regionCode);
+      setProvinces(list);
+      setMunicipalities([]);
+      setBarangays([]);
+    })();
+  }, [data.regionCode]);
+
+  useEffect(() => {
+    if (!data.provinceCode) {
+      setMunicipalities([]);
+      setBarangays([]);
+      return;
+    }
+
+    (async () => {
+      const list = await fetchPSGCResource("cities-municipalities", data.provinceCode);
+      setMunicipalities(list);
+      setBarangays([]);
+    })();
+  }, [data.provinceCode]);
+
+  useEffect(() => {
+    if (!data.cityCode) {
+      setBarangays([]);
+      return;
+    }
+
+    (async () => {
+      const list = await fetchPSGCResource("barangays", data.cityCode);
+      setBarangays(list);
+    })();
+  }, [data.cityCode]);
+
   const onChange = (k: keyof FormData, v: string) => {
     setData((d) => ({ ...d, [k]: v }));
     setErrors((e) => { const n = { ...e }; delete n[k as string]; return n; });
@@ -420,6 +558,50 @@ export default function OnboardPage() {
   const onSlot = (k: keyof FormData, s: UploadSlot) => {
     setData((d) => ({ ...d, [k]: s }));
     setErrors((e) => { const n = { ...e }; delete n[k as string]; return n; });
+  };
+
+  const onRegionSelect = (code: string, name: string) => {
+    setData((d) => ({
+      ...d,
+      regionCode: code,
+      region: name,
+      provinceCode: "",
+      province: "",
+      cityCode: "",
+      city: "",
+      barangayCode: "",
+      barangay: "",
+    }));
+    setErrors((e) => { const n = { ...e }; delete n.region; delete n.province; delete n.city; delete n.barangay; return n; });
+  };
+
+  const onProvinceSelect = (code: string, name: string) => {
+    setData((d) => ({
+      ...d,
+      provinceCode: code,
+      province: name,
+      cityCode: "",
+      city: "",
+      barangayCode: "",
+      barangay: "",
+    }));
+    setErrors((e) => { const n = { ...e }; delete n.province; delete n.city; delete n.barangay; return n; });
+  };
+
+  const onCitySelect = (code: string, name: string) => {
+    setData((d) => ({
+      ...d,
+      cityCode: code,
+      city: name,
+      barangayCode: "",
+      barangay: "",
+    }));
+    setErrors((e) => { const n = { ...e }; delete n.city; delete n.barangay; return n; });
+  };
+
+  const onBarangaySelect = (code: string, name: string) => {
+    setData((d) => ({ ...d, barangayCode: code, barangay: name }));
+    setErrors((e) => { const n = { ...e }; delete n.barangay; return n; });
   };
 
   const validate = (): boolean => {
@@ -434,6 +616,7 @@ export default function OnboardPage() {
       if (!data.phone.trim())          e.phone        = "Required";
     }
     if (step === 2) {
+      if (!data.region)                e.region    = "Required";
       if (!data.province)              e.province  = "Required";
       if (!data.city)                  e.city      = "Required";
       if (!data.barangay)              e.barangay  = "Required";
@@ -459,8 +642,6 @@ export default function OnboardPage() {
     setStep((s) => s + 1);
   };
 
-  const handleGoHome = () => router.push("/");
-
   const progress    = (step / TOTAL_STEPS) * 100;
   const displayRole = data.role === "__custom__" ? data.roleCustom : data.role;
   const fullName    = [data.firstName, data.middleInitial ? `${data.middleInitial}.` : "", data.lastName].filter(Boolean).join(" ");
@@ -483,7 +664,24 @@ export default function OnboardPage() {
       <main className={styles.main}>
         <div className={styles.stepContent}>
           {step === 1 && <Step1 data={data} errors={errors} on={onChange} />}
-          {step === 2 && <Step2 data={data} errors={errors} on={onChange} />}
+          {step === 2 && (
+            <Step2
+              data={data}
+              errors={errors}
+              onField={onChange}
+              onRegion={onRegionSelect}
+              onProvince={onProvinceSelect}
+              onCity={onCitySelect}
+              onBarangay={onBarangaySelect}
+              regions={regions}
+              provinces={provinces}
+              municipalities={municipalities}
+              barangays={barangays}
+              mapLabel={mapLabel}
+              mapCoords={mapCoords}
+              onCoordsChange={updateCoordinates}
+            />
+          )}
           {step === 3 && <Step3 data={data} errors={errors} on={onChange} />}
           {step === 4 && <Step4 data={data} errors={errors} on={onChange} onSlot={onSlot} />}
           {step === 5 && <Step5Verify fullName={fullName} role={displayRole} />}
