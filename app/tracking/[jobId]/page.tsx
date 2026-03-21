@@ -501,10 +501,16 @@ export default function TrackingPage({ params }: { params: Promise<{ jobId: stri
           }
         } else if (data.job?.status === "on_the_way") {
           // (Fallback: if backend is updated to on_the_way, also set status)
-          setStatus("on_the_way");
-          setProgress(0);
-          setElapsed(0);
-          setEtaRemaining(15);
+          if ((status as TrackingStatus) !== "on_the_way" && (status as TrackingStatus) !== "arrived") {
+            setStatus("on_the_way");
+            setProgress(0);
+            setElapsed(0);
+            setEtaRemaining(20);
+          }
+          // If ETA has reached 0 while on_the_way, transition to arrived
+          if ((status as TrackingStatus) === "on_the_way" && etaRemaining === 0) {
+            setStatus("arrived");
+          }
         } else if (data.job?.status === "working") {
           // Specialist has started working, redirect to working page
           router.push(`/working/${jobId}`);
@@ -520,19 +526,14 @@ export default function TrackingPage({ params }: { params: Promise<{ jobId: stri
     // Poll every 2 seconds
     const interval = setInterval(pollStatus, 2000);
     return () => clearInterval(interval);
-  }, [jobId, status, specialist, router]);
+  }, [jobId, status, etaRemaining, specialist, router]);
 
   /* ---- ETA countdown timer ---- */
   useEffect(() => {
     if (status !== "on_the_way") return;
     const tick = setInterval(
       () => setEtaRemaining((n) => {
-        const newEta = Math.max(0, n - 1);
-        // When ETA reaches 0, change status to arrived
-        if (newEta === 0 && status === "on_the_way") {
-          setStatus("arrived");
-        }
-        return newEta;
+        return Math.max(0, n - 1);
       }),
       1000,
     );

@@ -24,14 +24,14 @@ export async function GET(
       .select(
         `
         *,
-        customers:user_id (
+        customers:reviewer_id (
           id,
           full_name,
           avatar_url
         )
       `
       )
-      .eq("specialist_id", id)
+      .eq("reviewee_id", id)
       .order("created_at", { ascending: false })
       .limit(10);
 

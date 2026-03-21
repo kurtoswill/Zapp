@@ -18,7 +18,7 @@ import { supabase } from "@/lib/supabase";
  *   email, phone,
  *   province, municipality, barangay, street_address,
  *   latitude, longitude,
- *   role (profession), yearsExp,
+ *   role (profession), yearsExp, minRate,
  *   idType,
  *   idFrontUrl, idBackUrl, selfieUrl (public URLs from /api/upload),
  *   faceVerificationStatus (must be "Success")
@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
       longitude,
       role,
       yearsExp,
+      minRate,
       idType,
       idFrontUrl,
       idBackUrl,
@@ -168,6 +169,7 @@ export async function POST(request: NextRequest) {
         user_id: userId,
         profession: role,
         years_exp: yearsExp,
+        min_rate: minRate ? parseFloat(minRate) : 0,
         location_lat: parseFloat(latitude),
         location_lng: parseFloat(longitude),
         is_verified: true, // Auto-accept for prototype testing

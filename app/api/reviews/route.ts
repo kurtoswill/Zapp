@@ -48,6 +48,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Update specialist's rating average
+    const { data: reviews, error: reviewsError } = await supabase
+      .from('reviews')
+      .select('rating_value')
+      .eq('reviewee_id', reviewee_id);
+
+    if (!reviewsError && reviews && reviews.length > 0) {
+      const avgRating = reviews.reduce((sum, r) => sum + r.rating_value, 0) / reviews.length;
+      
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ rating_avg: avgRating })
+        .eq('id', reviewee_id);
+      
+      if (updateError) {
+        console.error('Failed to update specialist rating:', updateError);
+      }
+    }
+
     return NextResponse.json(
       { success: true, review: data },
       { status: 201 }

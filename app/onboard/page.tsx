@@ -51,7 +51,7 @@ interface FormData {
   email: string; phone: string;
   region: string; regionCode: string; province: string; provinceCode: string; city: string; cityCode: string; barangay: string; barangayCode: string; street: string;
   latitude: string; longitude: string;
-  role: string; roleCustom: string; yearsExp: string;
+  role: string; roleCustom: string; yearsExp: string; minRate: string;
   idType: string; idFront: UploadSlot; idBack: UploadSlot; selfie: UploadSlot;
   licenseImg: UploadSlot; certificateImg: UploadSlot;
 }
@@ -65,7 +65,7 @@ const EMPTY: FormData = {
   email: "", phone: "",
   region: "", regionCode: "", province: "", provinceCode: "", city: "", cityCode: "", barangay: "", barangayCode: "", street: "",
   latitude: "", longitude: "",
-  role: "", roleCustom: "", yearsExp: "",
+  role: "", roleCustom: "", yearsExp: "", minRate: "",
   idType: "", idFront: EMPTY_SLOT, idBack: EMPTY_SLOT, selfie: EMPTY_SLOT,
   licenseImg: EMPTY_SLOT, certificateImg: EMPTY_SLOT,
 };
@@ -337,6 +337,12 @@ function Step3({ data, errors, on }: { data: FormData; errors: FieldErrors; on: 
       <SelectField label="Years of experience" value={data.yearsExp}
         onChange={(v) => on("yearsExp", v)}
         options={YEARS_EXP} required error={errors.yearsExp} />
+
+      <Input label="Minimum rate (₱)" value={data.minRate}
+        onChange={(v) => on("minRate", v)}
+        placeholder="ex. 500"
+        type="number"
+        required error={errors.minRate} />
     </>
   );
 }
@@ -507,6 +513,7 @@ function Step5Verify({
           longitude: formData.longitude,
           role: formData.role === "__custom__" ? formData.roleCustom : formData.role,
           yearsExp: formData.yearsExp,
+          minRate: formData.minRate,
           idType: formData.idType,
           idFrontUrl,
           idBackUrl,
@@ -931,6 +938,8 @@ export default function OnboardPage() {
       if (!data.role)                  e.role      = "Required";
       if (data.role === "__custom__" && !data.roleCustom.trim()) e.roleCustom = "Please type your role";
       if (!data.yearsExp)              e.yearsExp  = "Required";
+      if (!data.minRate)               e.minRate   = "Required";
+      else if (isNaN(parseFloat(data.minRate)) || parseFloat(data.minRate) < 0) e.minRate = "Please enter a valid amount";
     }
     if (step === 4) {
       if (faceVerificationStatus !== "success") e.faceVerification = "Face verification must be completed";

@@ -59,7 +59,7 @@ export async function GET(
       email: data.profiles?.email || null,
       avatar_url: data.profiles?.avatar_url || null,
       phone: data.profiles?.phone || null,
-      role: data.profiles?.role || "specialist",
+      role: data.profession || null,
       province: data.profiles?.province || null,
       municipality: data.profiles?.municipality || null,
       location_lat: data.location_lat || null,
@@ -68,6 +68,7 @@ export async function GET(
       reviews_count: data.total_reviews || 0,
       jobs_completed: data.jobs_completed || 0,
       rate: data.rate || null,
+      min_rate: data.min_rate || null,
       is_online: data.is_online || false,
       is_verified: data.is_verified || false,
     };

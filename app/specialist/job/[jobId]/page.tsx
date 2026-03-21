@@ -11,8 +11,6 @@ import {
   Zap,
   Clock,
   CheckCircle2,
-  Smile,
-  Frown,
   ChevronRight,
   ArrowLeft,
 } from "lucide-react";
@@ -79,7 +77,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 /* ------------------------------------------------------------------ */
 /*  Types & constants                                                   */
 /* ------------------------------------------------------------------ */
-type JobStatus = "heading" | "arrived" | "working" | "rate_customer";
+type JobStatus = "heading" | "arrived" | "working";
 
 const SNAP_TOP_THRESHOLD = 750;
 const SNAP_BOTTOM_THRESHOLD = 250;
@@ -373,76 +371,6 @@ function SlideToComplete({ onComplete }: { onComplete: () => void }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  Rate customer screen                                                */
-/* ------------------------------------------------------------------ */
-function RateCustomer({
-  job,
-  onSubmit,
-}: {
-  job: JobData;
-  onSubmit: (happy: boolean) => void;
-}) {
-  const [selected, setSelected] = useState<boolean | null>(null);
-  const clientFirstName = job.clientName.split(" ")[0];
-
-  return (
-    <div className={styles.rateScreen}>
-      <div className={styles.rateIconWrap}>
-        <div className={styles.rateIconRing2} />
-        <div className={styles.rateIconRing1} />
-        <div className={styles.rateIconCenter}>
-          <CheckCircle2
-            size={28}
-            strokeWidth={1.5}
-            className={styles.rateIconCheck}
-          />
-        </div>
-      </div>
-
-      <h2 className={styles.rateTitle}>Job complete!</h2>
-      <p className={styles.rateSub}>
-        How was your experience with {clientFirstName}?
-      </p>
-
-      <div className={styles.rateOptions}>
-        <button
-          className={`${styles.rateOption} ${selected === true ? styles.rateOptionHappy : ""}`}
-          onClick={() => setSelected(true)}
-          aria-pressed={selected === true}
-        >
-          <Smile
-            size={36}
-            strokeWidth={1.5}
-            className={styles.rateOptionIcon}
-          />
-          <span>Happy</span>
-        </button>
-        <button
-          className={`${styles.rateOption} ${selected === false ? styles.rateOptionSad : ""}`}
-          onClick={() => setSelected(false)}
-          aria-pressed={selected === false}
-        >
-          <Frown
-            size={36}
-            strokeWidth={1.5}
-            className={styles.rateOptionIcon}
-          />
-          <span>Not happy</span>
-        </button>
-      </div>
-
-      <button
-        className={`${styles.submitRateBtn} ${selected === null ? styles.submitRateBtnDisabled : ""}`}
-        onClick={() => selected !== null && onSubmit(selected)}
-        disabled={selected === null}
-      >
-        Submit & go to dashboard
-      </button>
-    </div>
-  );
-}
-
 /* ================================================================== */
 /*  Page                                                                */
 /* ================================================================== */
@@ -615,7 +543,14 @@ export default function SpecialistJobPage() {
   useEffect(() => {
     if (status !== "heading") return;
     const tick = setInterval(
-      () => setEtaRemaining((n) => Math.max(0, n - 1)),
+      () => setEtaRemaining((n) => {
+        const newEta = Math.max(0, n - 1);
+        // When ETA reaches 0, change status to arrived
+        if (newEta === 0 && status === "heading") {
+          setStatus("arrived");
+        }
+        return newEta;
+      }),
       1000,
     );
     return () => clearInterval(tick);
@@ -678,9 +613,40 @@ export default function SpecialistJobPage() {
     router.push("/specialist/dashboard");
   };
 
+  const handleJobComplete = async () => {
+    try {
+      // Update job status to completed
+      await supabase
+        .from("jobs")
+        .update({
+          status: "completed",
+          completed_at: new Date().toISOString(),
+        })
+        .eq("id", jobId);
+
+      // Update specialist stats
+      const { data: specialistData } = await supabase
+        .from("specialists")
+        .select("jobs_completed")
+        .eq("user_id", (await supabase.auth.getUser()).data.user?.id)
+        .single();
+
+      if (specialistData) {
+        await supabase
+          .from("specialists")
+          .update({
+            jobs_completed: (specialistData.jobs_completed || 0) + 1,
+          })
+          .eq("user_id", (await supabase.auth.getUser()).data.user?.id);
+      }
+    } catch {// error ignored
+      console.error("Error completing job");
+    }
+    router.push("/specialist/dashboard");
+  };
+
   /* ---- Sheet content differs by status ---- */
   const showWorking = status === "working";
-  const showRate = status === "rate_customer";
 
   const elapsedMins = Math.floor(elapsed / 60);
   const elapsedSecs = elapsed % 60;
@@ -693,26 +659,6 @@ export default function SpecialistJobPage() {
           <Clock size={32} strokeWidth={1.5} />
           <span>Loading job details...</span>
         </div>
-      </div>
-    );
-  }
-
-  /* Rate screen — no map, full page */
-  if (showRate) {
-    return (
-      <div className={styles.ratePage}>
-        <header className={styles.pageHeader}>
-          <button
-            className={styles.backBtn}
-            onClick={() => router.push("/specialist/dashboard")}
-            aria-label="Back to dashboard"
-          >
-            <ArrowLeft size={20} strokeWidth={2} />
-          </button>
-          <span className={styles.headerTitle}>Rate Customer</span>
-          <div style={{ width: 40 }} />
-        </header>
-        <RateCustomer job={job} onSubmit={handleRateSubmit} />
       </div>
     );
   }
@@ -762,14 +708,6 @@ export default function SpecialistJobPage() {
             />
             <div className={styles.workClientInfo}>
               <span className={styles.workClientName}>{job.clientName}</span>
-              <div className={styles.workClientMeta}>
-                <Zap
-                  size={12}
-                  strokeWidth={2}
-                  className={styles.workClientIcon}
-                />
-                <span>{job.service}</span>
-              </div>
             </div>
             <span className={styles.workClientRate}>
               {job.currency}
@@ -789,7 +727,7 @@ export default function SpecialistJobPage() {
               <Phone size={18} strokeWidth={2} />
             </button>
           </div>
-          <SlideToComplete onComplete={() => setStatus("rate_customer")} />
+          <SlideToComplete onComplete={handleJobComplete} />
         </div>
       </div>
     );
@@ -834,10 +772,6 @@ export default function SpecialistJobPage() {
             />
             <div className={styles.clientInfo}>
               <span className={styles.clientName}>{job.clientName}</span>
-              <div className={styles.clientMeta}>
-                <Zap size={12} strokeWidth={2} className={styles.roleIcon} />
-                <span>{job.service}</span>
-              </div>
             </div>
             <span className={styles.clientRate}>
               {job.currency}
@@ -977,26 +911,21 @@ export default function SpecialistJobPage() {
 
         <button
           className={`${styles.actionBtn} ${status === "arrived" ? styles.actionBtnGreen : ""}`}
-          disabled={status === "heading" && etaRemaining > 0}
+          disabled={status !== "arrived"}
           onClick={async () => {
-            if (status === "heading") {
-              // Just change local status to arrived (database remains "on_the_way")
-              setStatus("arrived");
-            } else {
-              // Update backend status to working when starting work
-              try {
-                await supabase
-                  .from("jobs")
-                  .update({ status: "working" })
-                  .eq("id", jobId);
-              } catch (error) {
-                console.error("Error updating job status:", error);
-              }
-              setStatus("working");
+            // Update backend status to working when starting work
+            try {
+              await supabase
+                .from("jobs")
+                .update({ status: "working" })
+                .eq("id", jobId);
+            } catch (error) {
+              console.error("Error updating job status:", error);
             }
+            setStatus("working");
           }}
         >
-          {status === "heading" ? "I've arrived" : "Start working"}
+          Start working
         </button>
       </div>
     </div>

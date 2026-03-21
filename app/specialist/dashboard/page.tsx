@@ -580,28 +580,27 @@ export default function SpecialistDashboard() {
       try {
         setIsLoading(true);
 
+        // Always fetch by profession to ensure only relevant jobs are shown
+        if (!specialist?.role) {
+          setOffers([]);
+          setIsLoading(false);
+          return;
+        }
+
         const pendingUrl = new URL("/api/jobs", window.location.origin);
         pendingUrl.searchParams.set("status", "pending");
-        if (specialist?.id) {
-          pendingUrl.searchParams.set("specialist_id", specialist.id);
-        }
-        const res = await fetch(pendingUrl.toString());
-        let data: JobsResponse = await res.json();
+        pendingUrl.searchParams.set("profession", specialist.role);
 
-        // Fallback to fetching by profession for specialists without direct assignment
-        if ((!data.success || !data.jobs || data.jobs.length === 0) && specialist?.role) {
-          const fallbackUrl = new URL("/api/jobs", window.location.origin);
-          fallbackUrl.searchParams.set("status", "pending");
-          fallbackUrl.searchParams.set("profession", specialist.role);
-          const fr = await fetch(fallbackUrl.toString());
-          data = await fr.json();
-        }
+        const res = await fetch(pendingUrl.toString());
+        const data: JobsResponse = await res.json();
 
         if (data.success && data.jobs) {
           const mappedOffers = await Promise.all(
             data.jobs.map((job: Job) => mapJobToOffer(job)),
           );
           setOffers(mappedOffers);
+        } else {
+          setOffers([]);
         }
       } catch (error) {
         console.error("Failed to fetch jobs:", error);
@@ -613,7 +612,7 @@ export default function SpecialistDashboard() {
     if (isAuthenticated) {
       fetchJobs();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, specialist?.role]);
 
   // Fetch completed jobs and calculate earnings
   useEffect(() => {
