@@ -392,6 +392,7 @@ export default function TrackingPage({ params }: { params: Promise<{ jobId: stri
   /* ---- Data state ---- */
   const [job, setJob] = useState<Job | null>(null);
   const [specialist, setSpecialist] = useState<Specialist | null>(null);
+  const [customer, setCustomer] = useState<Specialist | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -437,6 +438,15 @@ export default function TrackingPage({ params }: { params: Promise<{ jobId: stri
         }
 
         setJob(jobData.job);
+
+        // Fetch customer location from customer profile
+        if (jobData.job.customer_id) {
+          const custRes = await fetch(`/api/specialists/${jobData.job.customer_id}`);
+          if (custRes.ok) {
+            const custData = await custRes.json();
+            setCustomer(custData.specialist);
+          }
+        }
 
         // Fetch specialist details if assigned
         if (jobData.job.specialist_id) {
@@ -526,7 +536,7 @@ export default function TrackingPage({ params }: { params: Promise<{ jobId: stri
     // Poll every 2 seconds
     const interval = setInterval(pollStatus, 2000);
     return () => clearInterval(interval);
-  }, [jobId, status, etaRemaining, specialist, router]);
+  }, [jobId, status, etaRemaining, specialist, customer, router]);
 
   /* ---- ETA countdown timer ---- */
   useEffect(() => {
@@ -664,10 +674,14 @@ export default function TrackingPage({ params }: { params: Promise<{ jobId: stri
 
   /* ---- Derived data ---- */
   const customerLocation = useMemo(() => {
+    // Use customer's profile location if available, otherwise fall back to job location
+    if (customer?.location_lat && customer?.location_lng) {
+      return { lat: customer.location_lat, lon: customer.location_lng };
+    }
     return job?.location_lat && job?.location_lng
       ? { lat: job.location_lat, lon: job.location_lng }
       : null;
-  }, [job?.location_lat, job?.location_lng]);
+  }, [customer?.location_lat, customer?.location_lng, job?.location_lat, job?.location_lng]);
 
   // Only show specialist location once a specialist has accepted the job
   const specialistLocation = useMemo(() => {
