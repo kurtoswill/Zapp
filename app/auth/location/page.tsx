@@ -171,7 +171,6 @@ function LocationForm() {
   const address = [form.street, form.barangay, form.city, form.province, form.region]
     .filter(Boolean)
     .join(", ");
-  const mapLabel = address || "Cavite State University";
 
   useEffect(() => {
     if (!address) {
