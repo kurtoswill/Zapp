@@ -62,6 +62,8 @@ export async function GET(
       role: data.profiles?.role || "specialist",
       province: data.profiles?.province || null,
       municipality: data.profiles?.municipality || null,
+      location_lat: data.location_lat || null,
+      location_lng: data.location_lng || null,
       rating: data.rating_avg || null,
       reviews_count: data.total_reviews || 0,
       jobs_completed: data.jobs_completed || 0,

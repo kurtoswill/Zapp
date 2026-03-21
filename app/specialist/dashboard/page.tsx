@@ -579,8 +579,23 @@ export default function SpecialistDashboard() {
     const fetchJobs = async () => {
       try {
         setIsLoading(true);
-        const res = await fetch("/api/jobs?status=pending");
-        const data: JobsResponse = await res.json();
+
+        const pendingUrl = new URL("/api/jobs", window.location.origin);
+        pendingUrl.searchParams.set("status", "pending");
+        if (specialist?.id) {
+          pendingUrl.searchParams.set("specialist_id", specialist.id);
+        }
+        const res = await fetch(pendingUrl.toString());
+        let data: JobsResponse = await res.json();
+
+        // Fallback to fetching by profession for specialists without direct assignment
+        if ((!data.success || !data.jobs || data.jobs.length === 0) && specialist?.role) {
+          const fallbackUrl = new URL("/api/jobs", window.location.origin);
+          fallbackUrl.searchParams.set("status", "pending");
+          fallbackUrl.searchParams.set("profession", specialist.role);
+          const fr = await fetch(fallbackUrl.toString());
+          data = await fr.json();
+        }
 
         if (data.success && data.jobs) {
           const mappedOffers = await Promise.all(
@@ -717,10 +732,24 @@ export default function SpecialistDashboard() {
   }, [specialist?.id]);
 
   const handleAccept = async (rate: number) => {
-    if (!selectedOffer || !specialist?.id) return;
+    if (!selectedOffer || !specialist?.id) {
+      alert("Missing offer or specialist information");
+      return;
+    }
 
     try {
-      // Create quote
+      // 1. Optionally update specialist location to current browser location (for demo)
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+          const { latitude, longitude } = pos.coords;
+          await supabase
+            .from("specialists")
+            .update({ location_lat: latitude, location_lng: longitude })
+            .eq("id", specialist.id);
+        });
+      }
+
+      // 2. Create quote
       const { data: quoteData, error: quoteError } = await supabase
         .from("quotes")
         .insert({
@@ -739,40 +768,63 @@ export default function SpecialistDashboard() {
         return;
       }
 
-      // Update job status
-      const { error: jobError } = await supabase
-        .from("jobs")
-        .update({
-          status: "bid_accepted",
-          specialist_id: specialist.id,
-          accepted_at: new Date().toISOString(),
-        })
-        .eq("id", selectedOffer.id);
+      // 4. Update job status via API endpoint
+      const requestBody = {
+        status: "bid_accepted",
+        specialist_id: specialist.id,
+      };
+      const jobUpdateRes = await fetch(`/api/jobs/${selectedOffer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestBody),
+      });
 
-      if (jobError) {
-        console.error("Error updating job:", jobError);
-        alert("Failed to accept job. Please try again.");
+      if (!jobUpdateRes.ok) {
+        let errorMessage = `HTTP Error ${jobUpdateRes.status}`;
+        const contentType = jobUpdateRes.headers.get("content-type");
+        try {
+          const responseText = await jobUpdateRes.text();
+          if (contentType?.includes("application/json")) {
+            const parsed = JSON.parse(responseText);
+            errorMessage = parsed.error || parsed.message || errorMessage;
+          } else if (responseText) {
+            errorMessage = responseText;
+          }
+        } catch (err) {}
+        alert(`Failed to accept job (${jobUpdateRes.status}): ${errorMessage}`);  
         return;
       }
 
-      // Update pending earnings
-      setPending((prev) => prev + rate);
+      const jobData = await jobUpdateRes.json();
+      if (!jobData.success) {
+        alert(`Failed to accept job: ${jobData.error || "Please try again."}`);  
+      }
 
-      // Remove from offers list
+      setPending((prev) => prev + rate);
       setOffers((prev) => prev.filter((o) => o.id !== selectedOffer.id));
       setSelectedOffer(null);
-
-      // Navigate to job tracking
       router.push(`/specialist/job/${selectedOffer.id}`);
     } catch (error) {
-      console.error("Failed to accept job:", error);
       alert("Failed to accept job. Please try again.");
     }
   };
 
   const handleReject = async () => {
-    if (!selectedOffer) return;
+    if (!selectedOffer || !specialist?.id) return;
+
     try {
+      // Reassign job (customer continues searching). Remove current specialist assignment.
+      const res = await fetch(`/api/jobs/${selectedOffer.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reassign: true }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        console.error("Failed to reassign job:", err);
+      }
+
       setOffers((prev) => prev.filter((o) => o.id !== selectedOffer.id));
       setSelectedOffer(null);
     } catch (error) {

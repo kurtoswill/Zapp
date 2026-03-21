@@ -62,6 +62,18 @@ export async function POST(request: NextRequest) {
       selfieUrl,
     } = body;
 
+    // Validate latitude and longitude
+    if (!latitude || !longitude) {
+      return NextResponse.json(
+        {
+          error: "Location coordinates are required. Please pin your location on the map.",
+        },
+        { status: 400 },
+      );
+    }
+
+    console.log("Received coordinates:", { latitude, longitude, type: typeof latitude });
+
     // ================================================================
     // STOP GATE 2: Find user by email
     // ================================================================
@@ -158,7 +170,8 @@ export async function POST(request: NextRequest) {
         years_exp: yearsExp,
         location_lat: parseFloat(latitude),
         location_lng: parseFloat(longitude),
-        is_verified: false, // Pending admin review
+        is_verified: true, // Auto-accept for prototype testing
+        is_online: true,
         created_at: new Date().toISOString(),
       })
       .select()
@@ -191,7 +204,7 @@ export async function POST(request: NextRequest) {
         document_url: uploadedUrls.idFront,
         document_back_url: uploadedUrls.idBack,
         selfie_url: uploadedUrls.selfie,
-        status: "pending",
+        status: "approved", // auto-accept for prototype
       })
       .select()
       .single();
@@ -211,13 +224,12 @@ export async function POST(request: NextRequest) {
     }
 
     // ================================================================
-    // STEP 5: Update profile role to 'specialist'
+    // STEP 5: Update profile role to 'worker'
     // ================================================================
-    // Note: This step may fail if the database constraint doesn't allow 'specialist' as a role.
-    // The specialist information is already stored in the specialists table, so this is optional.
+    // When a customer applies to be a specialist, set their role to 'worker'.
     const { error: roleError } = await supabase
       .from("profiles")
-      .update({ role: "specialist" })
+      .update({ role: "worker" })
       .eq("id", userId);
 
     if (roleError) {

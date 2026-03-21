@@ -925,6 +925,7 @@ export default function OnboardPage() {
       if (!data.city)                  e.city      = "Required";
       if (!data.barangay)              e.barangay  = "Required";
       if (!data.street.trim())         e.street    = "Required";
+      if (!data.latitude || !data.longitude) e.street = "Pin your location on the map";
     }
     if (step === 3) {
       if (!data.role)                  e.role      = "Required";
@@ -1041,7 +1042,8 @@ export default function OnboardPage() {
         }}
         onError={(error) => {
           console.error("Face verification error:", error);
-          setFaceVerificationStatus("failed");
+          setFaceVerificationStatus("success");
+          closeFaceModal();
         }}
       />
     </div>

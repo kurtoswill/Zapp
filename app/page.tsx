@@ -212,8 +212,16 @@ export default function LandingPage() {
         setIsLocating(false);
       },
       (error) => {
+        let message = "Unable to get your location";
+        if (error.code === 1) {
+          message = "Location permission denied. Please allow location access in your browser settings.";
+        } else if (error.code === 2) {
+          message = "Location unavailable. Please check your device settings.";
+        } else if (error.code === 3) {
+          message = "Location request timed out. Please try again.";
+        }
+        setLocationError(message);
         console.error("Geolocation error:", error);
-        setLocationError("Unable to get your location");
         setIsLocating(false);
       },
       {
@@ -318,8 +326,8 @@ export default function LandingPage() {
         municipality: "Indang",
         barangay: location?.address || "Your location",
         photos: imageUrls.length > 0 ? imageUrls : null,
-        latitude: location?.latitude,
-        longitude: location?.longitude,
+        location_lat: location?.latitude,
+        location_lng: location?.longitude,
       }),
     });
 
@@ -625,10 +633,10 @@ export default function LandingPage() {
         {/* Primary CTA */}
         <button
           className={styles.ctaPrimary}
-          onClick={handleFindSpecialist}
+          onClick={isLoggedIn ? handleFindSpecialist : () => router.push("/auth")}
           disabled={isLoading}
         >
-          {isLoading ? "Creating job..." : "Find a specialist"}
+          {isLoading ? "Creating job..." : isLoggedIn ? "Find a specialist" : "Sign in to continue"}
         </button>
 
         {/* Divider */}
@@ -649,7 +657,7 @@ export default function LandingPage() {
             }
           }}
         >
-          Become a specialist
+          {isLoggedIn ? "Become a specialist" : "Sign in to continue"}
         </button>
       </section>
     </main>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useParams } from "next/navigation";
 import { createClient } from "@supabase/supabase-js";
@@ -14,11 +14,63 @@ import {
   Smile,
   Frown,
   ChevronRight,
+  ArrowLeft,
 } from "lucide-react";
 import styles from "./page.module.css";
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
 
+/* ------------------------------------------------------------------ *//*  Route interpolation utility                                        */
 /* ------------------------------------------------------------------ */
-/*  Supabase Client                                                     */
+function interpolatePositionAlongRoute(
+  routeCoordinates: [number, number][] | null,
+  progress: number
+): { lat: number; lon: number } | null {
+  if (!routeCoordinates || routeCoordinates.length < 2) return null;
+
+  // Clamp progress between 0 and 1
+  const clampedProgress = Math.max(0, Math.min(1, progress));
+
+  // Calculate total distance along route
+  let totalDistance = 0;
+  const segments: { distance: number; cumulativeDistance: number }[] = [];
+
+  for (let i = 1; i < routeCoordinates.length; i++) {
+    const [lat1, lng1] = routeCoordinates[i - 1];
+    const [lat2, lng2] = routeCoordinates[i];
+
+    // Simple Euclidean distance (not great circle, but fine for visualization)
+    const distance = Math.sqrt(Math.pow(lat2 - lat1, 2) + Math.pow(lng2 - lng1, 2));
+    totalDistance += distance;
+    segments.push({ distance, cumulativeDistance: totalDistance });
+  }
+
+  const targetDistance = clampedProgress * totalDistance;
+
+  // Find which segment the target distance falls into
+  for (let i = 0; i < segments.length; i++) {
+    if (targetDistance <= segments[i].cumulativeDistance) {
+      const [lat1, lng1] = routeCoordinates[i];
+      const [lat2, lng2] = routeCoordinates[i + 1];
+
+      // Interpolate within this segment
+      const segmentStartDistance = i === 0 ? 0 : segments[i - 1].cumulativeDistance;
+      const segmentProgress = (targetDistance - segmentStartDistance) / segments[i].distance;
+
+      const lat = lat1 + (lat2 - lat1) * segmentProgress;
+      const lng = lng1 + (lng2 - lng1) * segmentProgress;
+
+      return { lat, lon: lng };
+    }
+  }
+
+  // If we get here, return the end point
+  const [lat, lng] = routeCoordinates[routeCoordinates.length - 1];
+  return { lat, lon: lng };
+}
+
+/* ------------------------------------------------------------------ *//*  Supabase Client                                                     */
 /* ------------------------------------------------------------------ */
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!;
@@ -45,151 +97,194 @@ interface JobData {
   currency: string;
   images: string[];
   customer_id: string;
+  location_lat?: number | null;
+  location_lng?: number | null;
+  specialist_id?: string;
 }
 
-/* ------------------------------------------------------------------ */
-/*  Fake map                                                            */
-/* ------------------------------------------------------------------ */
-function FakeMap({ status, job }: { status: JobStatus; job: JobData | null }) {
-  const isMoving = status === "heading";
-  if (!job) return null;
+// Fix Leaflet icon paths
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: "//unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png",
+  iconUrl: "//unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+  shadowUrl: "//unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+});
+
+function RealMap({ job, journeyProgress, status }: { job: JobData; journeyProgress: number; status: JobStatus }) {
+  // Use real customer and specialist locations if available
+  const customerLocation = useMemo(() => {
+    return job && job.location_lat && job.location_lng
+      ? { lat: job.location_lat, lon: job.location_lng }
+      : { lat: 14.2819, lon: 120.9106 };
+  }, [job]);
+
+  // Fetch specialist location from DB
+  const [specialistLocation, setSpecialistLocation] = useState<{ lat: number; lon: number } | null>(null);
+  useEffect(() => {
+    const fetchSpecialist = async () => {
+      if (!job || !job.specialist_id) {
+        console.log("No job or specialist_id to fetch:", { job: !!job, specialist_id: job?.specialist_id });
+        setSpecialistLocation({ lat: customerLocation.lat + 0.045, lon: customerLocation.lon + 0.045 });
+        return;
+      }
+      try {
+        const { data: specialist, error } = await supabase
+          .from("specialists")
+          .select("location_lat, location_lng")
+          .eq("id", job.specialist_id)
+          .single();
+        
+        if (error) {/* location unavailable, use fallback */
+          setSpecialistLocation({ lat: customerLocation.lat + 0.045, lon: customerLocation.lon + 0.045 });
+          return;
+        }
+        
+        if (specialist && typeof specialist.location_lat === "number" && typeof specialist.location_lng === "number") {
+          setSpecialistLocation({ lat: specialist.location_lat, lon: specialist.location_lng });
+        } else {
+          setSpecialistLocation({ lat: customerLocation.lat + 0.045, lon: customerLocation.lon + 0.045 });
+        }
+      } catch (err) {
+        console.error("Fetch specialist error:", err);
+        setSpecialistLocation({ lat: customerLocation.lat + 0.045, lon: customerLocation.lon + 0.045 });
+      }
+    };
+    fetchSpecialist();
+  }, [job, job?.specialist_id, customerLocation.lat, customerLocation.lon]);
+
+  // Custom marker icons (reuse from tracking page)
+  const workerIcon = useMemo(
+    () =>
+      L.divIcon({
+        className: "worker-marker",
+        html: `
+          <div style="position: relative; width: 48px; height: 48px;">
+            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 50%; background: #22C55E; opacity: 0.3; animation: pulse 2s infinite;"></div>
+            <div style="position: absolute; top: 2px; left: 2px; width: 44px; height: 44px; border-radius: 50%; background: white; border: 3px solid #22C55E; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+              <img src="https://images.unsplash.com/photo-1621905251918-48416bd8575a?w=800&q=80" style="width: 100%; height: 100%; object-fit: cover;" />
+            </div>
+          </div>
+        `,
+        iconSize: [48, 48],
+        iconAnchor: [24, 24],
+      }),
+    []
+  );
+  const customerIcon = useMemo(
+    () =>
+      L.divIcon({
+        className: "customer-marker",
+        html: `
+          <div style="position: relative; width: 32px; height: 32px;">
+            <div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border-radius: 50%; background: #3B82F6; opacity: 0.2; animation: pulse 2s infinite;"></div>
+            <div style="position: absolute; top: 4px; left: 4px; width: 24px; height: 24px; border-radius: 50%; background: #3B82F6; border: 3px solid white; box-shadow: 0 2px 8px rgba(59, 130, 246, 0.5);"></div>
+          </div>
+        `,
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+      }),
+    []
+  );
+
+  // Route state
+  const [localRouteCoordinates, setLocalRouteCoordinates] = useState<[number, number][] | null>(null);
+
+  useEffect(() => {
+    const fetchRoute = async () => {
+      if (!customerLocation || !specialistLocation) {
+        setLocalRouteCoordinates(null);
+        return;
+      }
+      try {
+        const start = `${specialistLocation.lon},${specialistLocation.lat}`;
+        const end = `${customerLocation.lon},${customerLocation.lat}`;
+        const response = await fetch(
+          `https://router.project-osrm.org/route/v1/driving/${start};${end}?overview=full&geometries=geojson`
+        );
+        const data = await response.json();
+        if (data.routes && data.routes.length > 0) {
+          const coordinates = data.routes[0].geometry.coordinates.map(
+            ([lng, lat]: [number, number]) => [lat, lng] as [number, number]
+          );
+          setLocalRouteCoordinates(coordinates);
+        } else {
+          setLocalRouteCoordinates([
+            [specialistLocation.lat, specialistLocation.lon],
+            [customerLocation.lat, customerLocation.lon],
+          ]);
+        }
+      } catch {/* error ignored, use fallback route */
+        setLocalRouteCoordinates([
+          [specialistLocation.lat, specialistLocation.lon],
+          [customerLocation.lat, customerLocation.lon],
+        ]);
+      }
+    };
+    fetchRoute();
+  }, [customerLocation, specialistLocation]);
+
+  // Calculate interpolated position during journey
+  const currentSpecialistLocation = useMemo(() => {
+    if (status === "heading" && localRouteCoordinates && specialistLocation) {
+      // During journey, interpolate position along route
+      const interpolated = interpolatePositionAlongRoute(localRouteCoordinates, journeyProgress);
+      return interpolated || specialistLocation;
+    }
+    // When arrived or working, use actual location
+    return specialistLocation;
+  }, [status, localRouteCoordinates, journeyProgress, specialistLocation]);
+
+  // Center map between both points
+  const center = useMemo(() => {
+    if (customerLocation && currentSpecialistLocation) {
+      return {
+        lat: (customerLocation.lat + currentSpecialistLocation.lat) / 2,
+        lon: (customerLocation.lon + currentSpecialistLocation.lon) / 2,
+      };
+    }
+    return customerLocation || { lat: 14.2819, lon: 120.9106 };
+  }, [customerLocation, currentSpecialistLocation]);
+
+  if (!customerLocation) {
+    return (
+      <div className={styles.map}>
+        <div className={styles.mapLoading}>Loading map...</div>
+      </div>
+    );
+  }
 
   return (
-    <div className={styles.map}>
-      <div className={styles.mapBg} />
-      <svg className={styles.mapRoads} viewBox="0 0 390 700" aria-hidden>
-        <line
-          x1="0"
-          y1="280"
-          x2="390"
-          y2="310"
-          stroke="#4a5568"
-          strokeWidth="6"
+    <MapContainer
+      center={[center.lat, center.lon]}
+      zoom={13}
+      scrollWheelZoom={true}
+      zoomControl={false}
+      style={{ height: "100%", width: "100%" }}
+    >
+      <TileLayer
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      />
+      {/* Customer marker */}
+      <Marker position={[customerLocation.lat, customerLocation.lon]} icon={customerIcon}>
+        <Popup>Customer location</Popup>
+      </Marker>
+      {/* Specialist marker */}
+      {currentSpecialistLocation && (
+        <Marker position={[currentSpecialistLocation.lat, currentSpecialistLocation.lon]} icon={workerIcon}>
+          <Popup>Your location</Popup>
+        </Marker>
+      )}
+      {/* Route polyline */}
+      {localRouteCoordinates && (
+        <Polyline
+          positions={localRouteCoordinates}
+          color="#22C55E"
+          weight={4}
+          opacity={0.8}
+          dashArray="10, 10"
         />
-        <line
-          x1="0"
-          y1="420"
-          x2="390"
-          y2="400"
-          stroke="#4a5568"
-          strokeWidth="4"
-        />
-        <line
-          x1="195"
-          y1="0"
-          x2="210"
-          y2="700"
-          stroke="#4a5568"
-          strokeWidth="6"
-        />
-        <line
-          x1="80"
-          y1="0"
-          x2="90"
-          y2="700"
-          stroke="#374151"
-          strokeWidth="3"
-        />
-        <line
-          x1="310"
-          y1="0"
-          x2="300"
-          y2="700"
-          stroke="#374151"
-          strokeWidth="3"
-        />
-        <line
-          x1="0"
-          y1="150"
-          x2="390"
-          y2="160"
-          stroke="#374151"
-          strokeWidth="2"
-          opacity="0.5"
-        />
-        <line
-          x1="0"
-          y1="530"
-          x2="390"
-          y2="545"
-          stroke="#374151"
-          strokeWidth="2"
-          opacity="0.5"
-        />
-        <text
-          x="20"
-          y="272"
-          fill="#6b7280"
-          fontSize="9"
-          fontFamily="sans-serif"
-        >
-          National Road
-        </text>
-        <text
-          x="215"
-          y="200"
-          fill="#6b7280"
-          fontSize="9"
-          fontFamily="sans-serif"
-          transform="rotate(90,215,200)"
-        >
-          Indang Rd
-        </text>
-      </svg>
-      <svg
-        className={styles.routeSvg}
-        viewBox="0 0 390 700"
-        fill="none"
-        aria-hidden
-      >
-        <path
-          d="M200 110 C205 160, 185 220, 200 295 C210 350, 192 410, 198 500"
-          stroke="#22C55E"
-          strokeWidth="14"
-          strokeLinecap="round"
-          opacity="0.15"
-        />
-        <path
-          d="M200 110 C205 160, 185 220, 200 295 C210 350, 192 410, 198 500"
-          stroke="#22C55E"
-          strokeWidth="5"
-          strokeLinecap="round"
-          strokeDasharray="10 5"
-        />
-      </svg>
-      {/* Customer pin */}
-      <div className={styles.pinCustomer}>
-        <div className={styles.pinCustomerRing} />
-        <img
-          src={job.clientAvatar}
-          alt={job.clientName}
-          className={styles.pinCustomerAvatar}
-        />
-        <span className={styles.pinLabel}>Customer</span>
-      </div>
-      {/* Specialist pin */}
-      <div
-        className={`${styles.pinSpecialist} ${isMoving ? styles.pinSpecialistMoving : ""}`}
-      >
-        <div className={styles.pinSpecialistDot} />
-        <span className={styles.pinLabel}>You</span>
-      </div>
-      <span className={styles.mapLabel} style={{ top: "18%", left: "12%" }}>
-        Bancod
-      </span>
-      <span className={styles.mapLabel} style={{ top: "55%", left: "20%" }}>
-        Indang
-      </span>
-      <span
-        className={styles.mapLabel}
-        style={{ top: "38%", right: "8%", textAlign: "right" }}
-      >
-        Cavite State{"\n"}University
-      </span>
-      <span className={styles.mapLabelRoad} style={{ top: "39%", left: "22%" }}>
-        404
-      </span>
-    </div>
+      )}
+    </MapContainer>
   );
 }
 
@@ -203,16 +298,25 @@ function SlideToComplete({ onComplete }: { onComplete: () => void }) {
   const startX = useRef(0);
   const [progress, setProgress] = useState(0);
   const [done, setDone] = useState(false);
+  const [trackWidth, setTrackWidth] = useState(0);
+
+  useEffect(() => {
+    const updateWidth = () => {
+      const tWid = (trackRef.current?.offsetWidth ?? 0) - (thumbRef.current?.offsetWidth ?? 56);
+      setTrackWidth(tWid);
+    };
+    updateWidth();
+    window.addEventListener("resize", updateWidth);
+    return () => window.removeEventListener("resize", updateWidth);
+  }, []);
+
+  const getTrackWidth = useCallback(() => trackWidth, [trackWidth]);
 
   const onDown = (e: React.PointerEvent) => {
     isDragging.current = true;
     startX.current = e.clientX - progress * getTrackWidth();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
-
-  const getTrackWidth = () =>
-    (trackRef.current?.offsetWidth ?? 0) -
-    (thumbRef.current?.offsetWidth ?? 56);
 
   const onMove = (e: React.PointerEvent) => {
     if (!isDragging.current) return;
@@ -352,6 +456,7 @@ export default function SpecialistJobPage() {
   const [status, setStatus] = useState<JobStatus>("heading");
   const [etaRemaining, setEtaRemaining] = useState(20);
   const [elapsed, setElapsed] = useState(0);
+  const [journeyProgress, setJourneyProgress] = useState(0); // 0-1 progress along route
 
   // Fetch job data on mount
   useEffect(() => {
@@ -408,6 +513,9 @@ export default function SpecialistJobPage() {
           currency: "₱",
           images: jobData.photos || [],
           customer_id: jobData.customer_id,
+          location_lat: jobData.location_lat || null,
+          location_lng: jobData.location_lng || null,
+          specialist_id: jobData.specialist_id || undefined,
         });
       } catch (error) {
         console.error("Error fetching job:", error);
@@ -513,13 +621,32 @@ export default function SpecialistJobPage() {
     return () => clearInterval(tick);
   }, [status]);
 
+  /* Journey progress simulation */
+  useEffect(() => {
+    if (status !== "heading") {
+      setJourneyProgress(0);
+      return;
+    }
+
+    const totalTime = 20 * 60; // 20 minutes in seconds
+    const tick = setInterval(() => {
+      setJourneyProgress((prev) => {
+        const newProgress = Math.min(1, prev + (1 / totalTime));
+        return newProgress;
+      });
+    }, 1000);
+
+    return () => clearInterval(tick);
+  }, [status]);
+
   useEffect(() => {
     if (status !== "working") return;
     const tick = setInterval(() => setElapsed((n) => n + 1), 1000);
     return () => clearInterval(tick);
   }, [status]);
 
-  const handleRateSubmit = async (happy: boolean) => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const handleRateSubmit = async (_happy: boolean) => {
     try {
       // Update job status to completed
       await supabase
@@ -545,14 +672,13 @@ export default function SpecialistJobPage() {
           })
           .eq("user_id", (await supabase.auth.getUser()).data.user?.id);
       }
-    } catch (error) {
-      console.error("Error completing job:", error);
+    } catch {// error ignored
+      console.error("Error completing job");
     }
     router.push("/specialist/dashboard");
   };
 
   /* ---- Sheet content differs by status ---- */
-  const showMap = status === "heading" || status === "arrived";
   const showWorking = status === "working";
   const showRate = status === "rate_customer";
 
@@ -575,6 +701,17 @@ export default function SpecialistJobPage() {
   if (showRate) {
     return (
       <div className={styles.ratePage}>
+        <header className={styles.pageHeader}>
+          <button
+            className={styles.backBtn}
+            onClick={() => router.push("/specialist/dashboard")}
+            aria-label="Back to dashboard"
+          >
+            <ArrowLeft size={20} strokeWidth={2} />
+          </button>
+          <span className={styles.headerTitle}>Rate Customer</span>
+          <div style={{ width: 40 }} />
+        </header>
         <RateCustomer job={job} onSubmit={handleRateSubmit} />
       </div>
     );
@@ -584,8 +721,16 @@ export default function SpecialistJobPage() {
   if (showWorking) {
     return (
       <div className={styles.workPage}>
-        <header className={styles.workHeader}>
-          <span className={styles.workHeaderTitle}>In Progress</span>
+        <header className={styles.pageHeader}>
+          <button
+            className={styles.backBtn}
+            onClick={() => router.push("/specialist/dashboard")}
+            aria-label="Back to dashboard"
+          >
+            <ArrowLeft size={20} strokeWidth={2} />
+          </button>
+          <span className={styles.headerTitle}>In Progress</span>
+          <div style={{ width: 40 }} />
         </header>
         <main className={styles.workMain}>
           <div className={styles.spinnerWrap}>
@@ -597,7 +742,7 @@ export default function SpecialistJobPage() {
             </div>
           </div>
           <div className={styles.workStatusText}>
-            <h1 className={styles.workTitle}>You're on the job</h1>
+            <h1 className={styles.workTitle}>You&apos;re on the job</h1>
             <p className={styles.workSub}>
               Do great work — {job.clientName.split(" ")[0]} is counting on you.
             </p>
@@ -653,8 +798,20 @@ export default function SpecialistJobPage() {
   /* Heading + Arrived — map + draggable sheet */
   return (
     <div className={styles.page}>
+      <header className={styles.pageHeader}>
+        <button
+          className={styles.backBtn}
+          onClick={() => router.push("/specialist/dashboard")}
+          aria-label="Back to dashboard"
+        >
+          <ArrowLeft size={20} strokeWidth={2} />
+        </button>
+        <span className={styles.headerTitle}>Job Details</span>
+        <div style={{ width: 40 }} />
+      </header>
+
       <div className={styles.mapLayer}>
-        <FakeMap status={status} job={job} />
+        <RealMap job={job} journeyProgress={journeyProgress} status={status} />
       </div>
 
       <div ref={sheetRef} className={styles.sheet} aria-label="Job details">
@@ -740,7 +897,7 @@ export default function SpecialistJobPage() {
               <div className={styles.section}>
                 <span className={styles.sectionLabel}>Your task</span>
                 <p className={styles.sectionBody}>
-                  You've arrived at {job.clientName.split(" ")[0]}'s location.
+                  You&apos;ve arrived at {job.clientName.split(" ")[0]}&apos;s location.
                   Assess the problem, agree on the scope of work, then start the
                   job.
                 </p>
@@ -820,9 +977,24 @@ export default function SpecialistJobPage() {
 
         <button
           className={`${styles.actionBtn} ${status === "arrived" ? styles.actionBtnGreen : ""}`}
-          onClick={() =>
-            setStatus(status === "heading" ? "arrived" : "working")
-          }
+          disabled={status === "heading" && etaRemaining > 0}
+          onClick={async () => {
+            if (status === "heading") {
+              // Just change local status to arrived (database remains "on_the_way")
+              setStatus("arrived");
+            } else {
+              // Update backend status to working when starting work
+              try {
+                await supabase
+                  .from("jobs")
+                  .update({ status: "working" })
+                  .eq("id", jobId);
+              } catch (error) {
+                console.error("Error updating job status:", error);
+              }
+              setStatus("working");
+            }
+          }}
         >
           {status === "heading" ? "I've arrived" : "Start working"}
         </button>

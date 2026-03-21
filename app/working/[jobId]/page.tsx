@@ -36,9 +36,6 @@ const PAYMENT = {
   date:        new Date(2026, 2, 14, 14, 16), // 14 Mar 2026, 14:16
 };
 
-/** Simulated job duration in ms (10 s for demo) */
-const JOB_DURATION_MS = 10_000;
-
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
 /* ------------------------------------------------------------------ */
@@ -254,21 +251,44 @@ export default function WorkingPage() {
   const [showCodPending, setShowCodPending] = useState(false);
   const intervalRef                     = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  /* Simulate job completing after JOB_DURATION_MS */
+  /* Poll job status instead of using timer */
   useEffect(() => {
-    intervalRef.current = setInterval(() => {
+    const pollJobStatus = async () => {
+      try {
+        const jobId = window.location.pathname.split('/').pop();
+        if (!jobId) return;
+
+        const res = await fetch(`/api/jobs/${jobId}`);
+        const data = await res.json();
+
+        if (data.job?.status === "completed") {
+          setStage("done");
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current);
+          }
+        }
+      } catch (error) {
+        console.error("Error polling job status:", error);
+      }
+    };
+
+    // Poll every 2 seconds
+    intervalRef.current = setInterval(pollJobStatus, 2000);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, []);
+
+  /* Timer for elapsed time display */
+  useEffect(() => {
+    const timer = setInterval(() => {
       setElapsed((e) => e + 1);
     }, 1000);
 
-    const done = setTimeout(() => {
-      clearInterval(intervalRef.current!);
-      setStage("done");
-    }, JOB_DURATION_MS);
-
-    return () => {
-      clearInterval(intervalRef.current!);
-      clearTimeout(done);
-    };
+    return () => clearInterval(timer);
   }, []);
 
   const mins = Math.floor(elapsed / 60);

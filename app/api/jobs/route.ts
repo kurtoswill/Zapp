@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert job into database
-    const { data, error } = await supabase
+    const { data: jobData, error } = await supabase
       .from('jobs')
       .insert({
         customer_id,
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: true, job: data },
+      { success: true, job: jobData },
       { status: 201 }
     );
   } catch (error) {
@@ -89,12 +89,18 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(parseInt(limit));
 
+    const specialistId = searchParams.get('specialist_id');
+
     if (status) {
       query = query.eq('status', status);
     }
 
     if (profession) {
       query = query.eq('profession', profession);
+    }
+
+    if (specialistId) {
+      query = query.eq('specialist_id', specialistId);
     }
 
     const { data, error } = await query;

@@ -130,7 +130,7 @@ export default function AuthPage() {
         return;
       } else {
         // Sign in existing user
-        const { error: authError } =
+        const { data: authData, error: authError } =
           await supabase.auth.signInWithPassword({
             email: form.email,
             password: form.password,
@@ -141,9 +141,26 @@ export default function AuthPage() {
           throw new Error(authError.message || "Invalid email or password");
         }
 
-        setDone(true);
-        await new Promise((r) => setTimeout(r, 700));
-        router.push("/");
+        // Check if user is a specialist
+        const user = authData.user;
+        if (user) {
+          const { data: specialist, error: specError } = await supabase
+            .from("specialists")
+            .select("id")
+            .eq("user_id", user.id)
+            .limit(1);
+
+          setDone(true);
+          await new Promise((r) => setTimeout(r, 700));
+
+          // Redirect to specialist dashboard if they have a specialist profile
+          if (specialist && specialist.length > 0) {
+            router.push("/specialist/dashboard");
+          } else {
+            // Redirect to home page for customers
+            router.push("/");
+          }
+        }
       }
     } catch (error) {
       console.error("Auth error:", error);
