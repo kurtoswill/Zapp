@@ -17,6 +17,7 @@ import {
   ArrowUpRight,
   LogOut,
 } from "lucide-react";
+import ProfilePictureModal from "@/components/ProfilePictureModal/ProfilePictureModal";
 import styles from "./page.module.css";
 
 import { supabase } from "@/lib/supabase";
@@ -373,6 +374,13 @@ export default function SpecialistDashboard() {
   const [isLoadingSpecialist, setIsLoadingSpecialist] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
 
+<<<<<<< HEAD
+=======
+  // Profile picture modal state
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
+  // UI state
+>>>>>>> 37782226eb1feb079702d0bbab0d88a9be264d2b
   const [autoAccept, setAutoAccept] = useState(true);
   const [online, setOnline] = useState(true);
   const [activeTab, setActiveTab] = useState<"offers" | "completed">("offers");
@@ -806,6 +814,7 @@ export default function SpecialistDashboard() {
     }
   };
 
+<<<<<<< HEAD
   const handleLogout = async () => {
     try {
       const { error } = await supabase.auth.signOut();
@@ -821,6 +830,52 @@ export default function SpecialistDashboard() {
     }
   };
 
+=======
+  /* ---- Upload profile picture ---- */
+  const handleUploadProfilePicture = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("bucket", "avatars");
+
+    // Step 1: Upload image to storage
+    const uploadResponse = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    const uploadData = await uploadResponse.json();
+
+    if (!uploadResponse.ok) {
+      throw new Error(uploadData.error || "Failed to upload image");
+    }
+
+    const imageUrl = uploadData.url;
+
+    // Step 2: Update profile with new avatar URL
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
+
+    const profileResponse = await fetch("/api/profile/avatar", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ avatar_url: imageUrl }),
+    });
+
+    const profileData = await profileResponse.json();
+
+    if (!profileResponse.ok) {
+      throw new Error(profileData.error || "Failed to update profile");
+    }
+
+    // Update local state
+    setSpecialist((prev) => prev ? { ...prev, avatar: imageUrl } : prev);
+  };
+
+  // Show loading while fetching specialist
+>>>>>>> 37782226eb1feb079702d0bbab0d88a9be264d2b
   if (isLoadingSpecialist) {
     return (
       <div className={styles.page}>
@@ -857,8 +912,25 @@ export default function SpecialistDashboard() {
         <div className={styles.heroGlow} aria-hidden />
         <div className={styles.heroTop}>
           <div className={styles.heroAvatarWrap}>
+<<<<<<< HEAD
             <img src={specialist.avatar} alt={specialist.name} className={styles.heroAvatar} />
             <span className={`${styles.onlineDot} ${online ? styles.onlineDotActive : ""}`} />
+=======
+            <button
+              className={styles.heroAvatarButton}
+              onClick={() => setIsProfileModalOpen(true)}
+              aria-label="Change profile picture"
+            >
+              <img
+                src={specialist.avatar}
+                alt={specialist.name}
+                className={styles.heroAvatar}
+              />
+            </button>
+            <span
+              className={`${styles.onlineDot} ${online ? styles.onlineDotActive : ""}`}
+            />
+>>>>>>> 37782226eb1feb079702d0bbab0d88a9be264d2b
           </div>
           <div className={styles.heroIdentity}>
             <span className={styles.heroName}>{specialist.name}</span>
@@ -981,6 +1053,15 @@ export default function SpecialistDashboard() {
           onClose={() => setSelectedOffer(null)}
         />
       )}
+
+      {/* Profile Picture Modal */}
+      <ProfilePictureModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        currentAvatar={specialist.avatar}
+        onUpload={handleUploadProfilePicture}
+        userName={specialist.name}
+      />
     </div>
   );
 }
