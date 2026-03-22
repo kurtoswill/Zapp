@@ -1,195 +1,316 @@
 "use client";
-
-import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Star, CloudUpload, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { Loader, Star } from "lucide-react";
 import styles from "./page.module.css";
 
 /* ------------------------------------------------------------------ */
-/*  Data                                                                */
+/*  Types                                                               */
 /* ------------------------------------------------------------------ */
-const WORKER = {
-  name:   "Kurt Oswill McCarver",
-  avatar: "https://images.unsplash.com/photo-1621905251918-48416bd8575a?w=400&q=80",
-  role:   "Electrician",
-};
+interface Job {
+  id: string;
+  profession: string;
+  description: string;
+  specialist_id?: string;
+  worker_id?: string;
+  customer_id?: string;
+  status: string;
+  created_at: string;
+}
 
-interface UploadedFile {
-  name: string;
-  preview: string;
+interface Specialist {
+  id: string;
+  full_name: string;
+  avatar_url: string;
+  profession: string;
+  jobs_completed: number;
+  avg_rating: number;
 }
 
 /* ================================================================== */
-/*  Interactive star picker                                             */
+/*  Customer Rate Specialist Page                                      */
 /* ================================================================== */
-function StarPicker({
-  value,
-  onChange,
-}: {
-  value: number;
-  onChange: (n: number) => void;
-}) {
-  const [hovered, setHovered] = useState(0);
-  const active = hovered || value;
-
-  return (
-    <div className={styles.starRow} role="group" aria-label="Rate the worker">
-      {[1, 2, 3, 4, 5].map((n) => (
-        <button
-          key={n}
-          type="button"
-          className={styles.starBtn}
-          onMouseEnter={() => setHovered(n)}
-          onMouseLeave={() => setHovered(0)}
-          onClick={() => onChange(n)}
-          aria-label={`${n} star${n > 1 ? "s" : ""}`}
-          aria-pressed={value === n}
-        >
-          <Star
-            size={36}
-            strokeWidth={1.5}
-            className={`${styles.starIcon} ${active >= n ? styles.starFilled : ""}`}
-          />
-        </button>
-      ))}
-    </div>
-  );
-}
-
-/* ================================================================== */
-/*  Page                                                                */
-/* ================================================================== */
-export default function RatePage() {
+export default function RateSpecialistPage() {
   const router = useRouter();
-  const [rating, setRating]       = useState(0);
-  const [review, setReview]       = useState("");
-  const [files, setFiles]         = useState<UploadedFile[]>([]);
-  const [dragging, setDragging]   = useState(false);
+  const params = useParams();
+  const jobId = params?.jobId as string;
+
+  // Data states
+  const [job, setJob] = useState<Job | null>(null);
+  const [specialist, setSpecialist] = useState<Specialist | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Form states
+  const [rating, setRating] = useState(0);
+  const [hoverRating, setHoverRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  const fileInputRef              = useRef<HTMLInputElement>(null);
 
-  /* ---- File helpers ---- */
-  const addFiles = (incoming: FileList | null) => {
-    if (!incoming) return;
-    const next: UploadedFile[] = Array.from(incoming)
-      .filter((f) => f.type.startsWith("image/") || f.type.startsWith("video/"))
-      .map((f) => ({ name: f.name, preview: URL.createObjectURL(f) }));
-    setFiles((prev) => [...prev, ...next].slice(0, 6));
+  // Fetch job and specialist data
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Fetch job
+        const jobRes = await fetch(`/api/jobs/${jobId}`);
+        const jobData = await jobRes.json();
+
+        if (!jobData.success || !jobData.job) {
+          setError("Job not found");
+          return;
+        }
+
+        setJob(jobData.job);
+
+        // Fetch specialist
+        const specialistId = jobData.job.specialist_id || jobData.job.worker_id;
+        if (specialistId) {
+          const specRes = await fetch(`/api/specialists/${specialistId}`);
+          const specData = await specRes.json();
+
+          if (specData.success && specData.specialist) {
+            setSpecialist(specData.specialist);
+          } else {
+            setError("Specialist not found");
+          }
+        } else {
+          setError("No specialist assigned to this job");
+        }
+      } catch (err) {
+        console.error("Failed to fetch job/specialist:", err);
+        setError("Failed to load data. Please try again.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (jobId) {
+      fetchData();
+    }
+  }, [jobId]);
+
+  // Handle review submission
+  const handleSubmit = async () => {
+    if (!rating) {
+      setSubmitError("Please select a rating");
+      return;
+    }
+
+    if (!job || !specialist) {
+      setSubmitError("Job or specialist data missing");
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      setSubmitError(null);
+
+      const res = await fetch("/api/reviews", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          job_id: jobId,
+          reviewer_id: job.customer_id,
+          reviewee_id: specialist.id,
+          rating_value: rating,
+          comment: comment.trim() || null,
+          photos: null,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setSubmitted(true);
+        // Redirect after 2 seconds
+        setTimeout(() => {
+          router.push("/");
+        }, 2000);
+      } else {
+        setSubmitError(data.error || "Failed to submit review");
+      }
+    } catch (err) {
+      console.error("Failed to submit review:", err);
+      setSubmitError("An error occurred. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const removeFile = (i: number) =>
-    setFiles((prev) => prev.filter((_, idx) => idx !== i));
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.main} style={{ justifyContent: "center", alignItems: "center" }}>
+          <div style={{ textAlign: "center" }}>
+            <Loader size={32} style={{ animation: "spin 1s linear infinite", marginBottom: "16px" }} />
+            <p>Loading...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragging(false);
-    addFiles(e.dataTransfer.files);
-  };
+  // Error state
+  if (error) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.main} style={{ justifyContent: "center", alignItems: "center" }}>
+          <div style={{ textAlign: "center", color: "#e74c3c" }}>
+            <p>{error}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  /* ---- Submit ---- */
-  const handleSubmit = () => {
-    setSubmitted(true);
-    setTimeout(() => router.push("/"), 1200);
-  };
+  // Success state
+  if (submitted) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.main} style={{ justifyContent: "center", alignItems: "center" }}>
+          <div style={{ textAlign: "center" }}>
+            <div style={{ fontSize: "48px", marginBottom: "16px" }}>✓</div>
+            <h2 style={{ fontSize: "24px", color: "#27ae60", marginBottom: "8px" }}>Thank you!</h2>
+            <p>Your review has been submitted successfully.</p>
+            <p style={{ fontSize: "14px", color: "#7f8c8d", marginTop: "8px" }}>Redirecting...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
-  const canSubmit = rating > 0;
-
+  // Main form state
   return (
     <div className={styles.page}>
-
       {/* Header */}
-      <header className={styles.header}>
-        <span className={styles.headerTitle}>Your specialist finished the job!</span>
-      </header>
+      <div className={styles.header}>
+        <h1 className={styles.headerTitle}>Rate Specialist</h1>
+      </div>
 
-      {/* Content */}
-      <main className={styles.main}>
-
-        {/* Worker avatar + name */}
-        <div className={styles.workerSection}>
-          <div className={styles.avatar}>
-            <img src={WORKER.avatar} alt={WORKER.name} />
+      {/* Main content */}
+      <div className={styles.main}>
+        {/* Specialist Section */}
+        {specialist && (
+          <div className={styles.workerSection}>
+            <div className={styles.avatar}>
+              <img
+                src={specialist.avatar_url || "https://i.pravatar.cc/80?img=5"}
+                alt={specialist.full_name}
+              />
+            </div>
+            <h2 className={styles.workerName}>{specialist.full_name}</h2>
+            <p className={styles.ratingPrompt}>{specialist.profession}</p>
           </div>
-          <h1 className={styles.workerName}>{WORKER.name}</h1>
-        </div>
+        )}
 
-        {/* Rating prompt */}
+        {/* Job Info */}
+        {job && (
+          <div style={{ width: "100%", textAlign: "center", marginBottom: "24px" }}>
+            <p style={{ fontSize: "14px", color: "#7f8c8d", marginBottom: "4px" }}>{job.profession}</p>
+            <p style={{ fontSize: "13px", color: "#95a5a6" }}>{job.description.substring(0, 100)}...</p>
+          </div>
+        )}
+
+        {/* Rating Section */}
         <div className={styles.ratingSection}>
-          <p className={styles.ratingPrompt}>Work done well? Rate your specialist.</p>
-          <StarPicker value={rating} onChange={setRating} />
-        </div>
-
-        {/* Review textarea */}
-        <textarea
-          className={styles.reviewInput}
-          placeholder="Add a review"
-          value={review}
-          onChange={(e) => setReview(e.target.value)}
-          rows={4}
-          aria-label="Write a review"
-        />
-
-        {/* Upload zone */}
-        <div
-          className={`${styles.uploadZone} ${dragging ? styles.uploadZoneDragging : ""}`}
-          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={handleDrop}
-          onClick={() => fileInputRef.current?.click()}
-          role="button"
-          tabIndex={0}
-          aria-label="Upload photos or videos"
-          onKeyDown={(e) => e.key === "Enter" && fileInputRef.current?.click()}
-        >
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            accept="image/*,video/*"
-            className={styles.fileInputHidden}
-            onChange={(e) => addFiles(e.target.files)}
-          />
-          {files.length === 0 ? (
-            <div className={styles.uploadPlaceholder}>
-              <CloudUpload size={28} strokeWidth={1.5} className={styles.uploadIcon} />
-              <span className={styles.uploadLabel}>Upload your photos or videos</span>
-            </div>
-          ) : (
-            <div className={styles.uploadPreviews}>
-              {files.map((f, i) => (
-                <div key={i} className={styles.previewThumb}>
-                  <img src={f.preview} alt={f.name} />
-                  <button
-                    className={styles.previewRemove}
-                    aria-label={`Remove ${f.name}`}
-                    onClick={(e) => { e.stopPropagation(); removeFile(i); }}
-                  >
-                    <X size={10} strokeWidth={3} />
-                  </button>
-                </div>
-              ))}
-              {files.length < 6 && (
-                <div className={styles.previewAdd}>
-                  <CloudUpload size={18} strokeWidth={1.5} />
-                </div>
-              )}
-            </div>
+          <p className={styles.ratingPrompt}>How would you rate this specialist?</p>
+          <div className={styles.starRow}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <button
+                key={star}
+                className={styles.starBtn}
+                onClick={() => setRating(star)}
+                onMouseEnter={() => setHoverRating(star)}
+                onMouseLeave={() => setHoverRating(0)}
+                aria-label={`Rate ${star} star${star !== 1 ? "s" : ""}`}
+              >
+                <Star
+                  size={32}
+                  className={styles.starIcon}
+                  style={{
+                    fill: (hoverRating || rating) >= star ? "#E2C96B" : "transparent",
+                    color: "#E2C96B",
+                  }}
+                />
+              </button>
+            ))}
+          </div>
+          {rating > 0 && (
+            <p style={{ color: "#7f8c8d", fontSize: "14px", marginTop: "8px" }}>
+              {rating === 1 && "Poor"}
+              {rating === 2 && "Fair"}
+              {rating === 3 && "Good"}
+              {rating === 4 && "Great"}
+              {rating === 5 && "Excellent"}
+            </p>
           )}
         </div>
 
-      </main>
+        {/* Comment Section */}
+        <div style={{ width: "100%" }}>
+          <label style={{ display: "block", marginBottom: "8px", fontSize: "14px", fontWeight: "500" }}>
+            Add a comment (optional)
+          </label>
+          <textarea
+            className={styles.reviewInput}
+            placeholder="Tell others about your experience with this specialist..."
+            value={comment}
+            onChange={(e) => setComment(e.target.value.slice(0, 500))}
+            maxLength={500}
+          />
+          <p style={{ fontSize: "12px", color: "#95a5a6", textAlign: "right", marginTop: "8px" }}>
+            {comment.length}/500
+          </p>
+        </div>
 
-      {/* Submit button */}
+        {/* Error Message */}
+        {submitError && (
+          <div
+            style={{
+              width: "100%",
+              backgroundColor: "#ffe6e6",
+              color: "#e74c3c",
+              padding: "12px",
+              borderRadius: "8px",
+              fontSize: "14px",
+              marginTop: "16px",
+            }}
+          >
+            {submitError}
+          </div>
+        )}
+      </div>
+
+      {/* Bottom bar with submit button */}
       <div className={styles.bottomBar}>
         <button
-          className={`${styles.submitBtn} ${!canSubmit ? styles.submitBtnDisabled : ""} ${submitted ? styles.submitBtnDone : ""}`}
+          className={`${styles.submitBtn} ${isSubmitting || !rating ? styles.submitBtnDisabled : ""} ${submitted ? styles.submitBtnDone : ""}`}
           onClick={handleSubmit}
-          disabled={!canSubmit || submitted}
+          disabled={isSubmitting || !rating}
         >
-          {submitted ? "Thanks for your feedback!" : "Submit"}
+          {isSubmitting ? (
+            <span style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+              <Loader size={16} style={{ animation: "spin 1s linear infinite" }} />
+              Submitting...
+            </span>
+          ) : (
+            "Submit Review"
+          )}
         </button>
       </div>
 
+      <style>{`
+        @keyframes spin {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 }
