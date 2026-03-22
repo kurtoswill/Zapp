@@ -90,30 +90,6 @@ SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
 ---
 
-## Project Structure
-
-```
-app/
-├── auth/                        # Sign In / Sign Up
-├── (worker)/
-│   ├── worker-001/              # Specialist profile (Kurt Oswill McCarver)
-│   └── worker-002/              # Specialist profile (Ramon Dela Cruz)
-├── tracking/[jobId]/            # Customer live tracking
-├── working/[jobId]/             # Job in progress + payment + receipt
-├── rate/[jobId]/                # Customer rates specialist
-├── onboard/                     # Specialist KYC registration (4-step)
-└── specialist/
-    ├── dashboard/               # Specialist dashboard
-    └── job/[jobId]/             # Specialist job tracker
-
-components/
-├── ServiceChip/                 # Reusable service type chip
-├── StarRating/                  # Partial-fill star rating display
-├── ReviewCard/                  # Review card with lightbox image viewer
-└── WorkerBottomBar/             # Sticky bottom bar for worker profile
-```
-
----
 
 ## Getting Started
 
