@@ -8,6 +8,7 @@ import {
   Zap,
   BadgeCheck,
   CheckCircle2,
+  ArrowLeft,
   Search,
   X,
   Lock,
@@ -796,6 +797,15 @@ export default function TrackingPage({ params }: { params: Promise<{ jobId: stri
           routeCoordinates={routeCoordinates}
           journeyProgress={journeyProgress}
         />
+
+        {/* Back button overlay */}
+        <button
+          className={styles.backButton}
+          onClick={() => router.back()}
+          aria-label="Go back"
+        >
+          <ArrowLeft size={20} strokeWidth={2} />
+        </button>
       </div>
 
       {/* ── Layer 2: Worker profile sheet (draggable) ─────────────── */}

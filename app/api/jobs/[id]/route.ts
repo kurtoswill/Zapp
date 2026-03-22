@@ -118,13 +118,20 @@ export async function PATCH(
       const customerLng = jobData.location_lng;
       const excludedSpecialist = jobData.specialist_id;
 
-      const { data: specialists, error: specErr } = await supabase
+      // Build specialists query, excluding current specialist if assigned
+      let specialistsQuery = supabase
         .from('specialists')
         .select('*')
         .eq('profession', profession)
         .eq('is_online', true)
-        .eq('is_verified', true)
-        .neq('id', excludedSpecialist);
+        .eq('is_verified', true);
+
+      // Only exclude the current specialist if one is assigned
+      if (excludedSpecialist) {
+        specialistsQuery = specialistsQuery.neq('id', excludedSpecialist);
+      }
+
+      const { data: specialists, error: specErr } = await specialistsQuery;
 
       if (specErr) {
         console.error('Specialist lookup error during reassign:', specErr);

@@ -467,6 +467,8 @@ export default function SpecialistDashboard() {
   const [selectedOffer, setSelectedOffer] = useState<JobOffer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [autoAcceptedJobIds, setAutoAcceptedJobIds] = useState<Set<string>>(new Set());
+  const [declinedJobIds, setDeclinedJobIds] = useState<Map<string, number>>(new Map());
+  const [lastRejectionTime, setLastRejectionTime] = useState<number | null>(null);
 
   // Dynamic earnings state
   const [thisWeek, setThisWeek] = useState(0);
@@ -597,8 +599,15 @@ export default function SpecialistDashboard() {
         const data: JobsResponse = await res.json();
 
         if (data.success && data.jobs) {
+          const now = Date.now();
           const mappedOffers = await Promise.all(
-            data.jobs.map((job: Job) => mapJobToOffer(job)),
+            data.jobs
+              .filter((job: Job) => {
+                const declinedAt = declinedJobIds.get(job.id);
+                // Skip jobs declined within the last 10 seconds
+                return !declinedAt || (now - declinedAt) > 10000;
+              })
+              .map((job: Job) => mapJobToOffer(job)),
           );
           setOffers(mappedOffers);
         } else {
@@ -736,76 +745,53 @@ export default function SpecialistDashboard() {
   useEffect(() => {
     if (!autoAccept || !specialist?.id || offers.length === 0) return;
 
-    // Find the first offer that hasn't been auto-accepted yet
-    const newOffer = offers.find(
-      (offer) => !autoAcceptedJobIds.has(offer.id)
-    );
+    const checkForAutoAccept = () => {
+      const now = Date.now();
 
-    if (newOffer) {
-      console.log("Auto-accepting job:", newOffer.id);
-      // Call handleAutoAccept directly (it will be the latest version due to render cycle)
-      (async () => {
-        if (!specialist?.id) return;
+      // Check if enough time has passed since last rejection (4 second buffer)
+      if (lastRejectionTime && (now - lastRejectionTime) < 4000) {
+        return false; // Too soon after rejection
+      }
 
-        try {
-          // Optionally update specialist location to current browser location
-          if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(async (pos) => {
-              const { latitude, longitude } = pos.coords;
-              await supabase
-                .from("specialists")
-                .update({ location_lat: latitude, location_lng: longitude })
-                .eq("id", specialist.id);
-            });
-          }
-
-          // Create quote with suggested rate
-          const { data: quoteData, error: quoteError } = await supabase
-            .from("quotes")
-            .insert({
-              job_id: newOffer.id,
-              worker_id: specialist.id,
-              proposed_rate: newOffer.suggestedRate,
-              estimated_arrival: 30,
-              status: "sent",
-            })
-            .select()
-            .single();
-
-          if (quoteError) {
-            console.error("Error creating quote:", quoteError);
-            return;
-          }
-
-          // Update job status via API endpoint
-          const requestBody = {
-            status: "bid_accepted",
-            specialist_id: specialist.id,
-          };
-          const jobUpdateRes = await fetch(`/api/jobs/${newOffer.id}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(requestBody),
-          });
-
-          if (!jobUpdateRes.ok) {
-            console.error("Failed to update job status");
-            return;
-          }
-
-          const jobData = await jobUpdateRes.json();
-          if (jobData.success) {
-            setPending((prev) => prev + newOffer.suggestedRate);
-            setOffers((prev) => prev.filter((o) => o.id !== newOffer.id));
-            setAutoAcceptedJobIds((prev) => new Set(prev).add(newOffer.id));
-            router.push(`/specialist/job/${newOffer.id}`);
-          }
-        } catch (error) {
-          console.error("Auto-accept failed:", error);
+      // Find the first offer that hasn't been auto-accepted yet, isn't currently selected,
+      // and wasn't declined within the last 10 seconds
+      const newOffer = offers.find(
+        (offer) => {
+          const declinedAt = declinedJobIds.get(offer.id);
+          return !autoAcceptedJobIds.has(offer.id) &&
+                 offer.id !== selectedOffer?.id &&
+                 (!declinedAt || (now - declinedAt) > 10000);
         }
-      })();
+      );
+
+      if (newOffer && !selectedOffer) {
+        console.log("Auto-showing accept modal for job:", newOffer.id);
+        // Show the modal instead of accepting directly
+        setSelectedOffer(newOffer);
+        return true; // Modal was shown
+      }
+
+      return false; // No modal shown
+    };
+
+    // Try to show modal immediately
+    const modalShown = checkForAutoAccept();
+
+    // If modal wasn't shown and we're in cooldown, schedule a check
+    if (!modalShown && lastRejectionTime) {
+      const now = Date.now();
+      const timeSinceRejection = now - lastRejectionTime;
+
+      if (timeSinceRejection < 4000) {
+        const remainingTime = 4000 - timeSinceRejection;
+        const timeoutId = setTimeout(() => {
+          checkForAutoAccept();
+        }, remainingTime);
+
+        return () => clearTimeout(timeoutId);
+      }
     }
-  }, [offers, autoAccept, specialist?.id, autoAcceptedJobIds, router]);
+  }, [offers, autoAccept, specialist?.id, autoAcceptedJobIds, selectedOffer, lastRejectionTime]);
 
   const handleAccept = async (rate: number) => {
     if (!selectedOffer || !specialist?.id) {
@@ -870,6 +856,7 @@ export default function SpecialistDashboard() {
 
       setPending((prev) => prev + rate);
       setOffers((prev) => prev.filter((o) => o.id !== selectedOffer.id));
+      setAutoAcceptedJobIds((prev) => new Set(prev).add(selectedOffer.id));
       setSelectedOffer(null);
       router.push(`/specialist/job/${selectedOffer.id}`);
     } catch (error) {
@@ -889,11 +876,23 @@ export default function SpecialistDashboard() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        console.error("Failed to reassign job:", err);
+        let errorMessage = `HTTP ${res.status}`;
+        try {
+          const err = await res.json();
+          errorMessage += err.error ? `: ${err.error}` : '';
+          if (err.details) errorMessage += ` (${err.details})`;
+        } catch (parseError) {
+          // If response body can't be parsed as JSON, use status text
+          errorMessage += res.statusText ? `: ${res.statusText}` : '';
+        }
+        console.error("Failed to reassign job:", errorMessage);
+        // Still proceed with rejection even if reassign fails
       }
 
-      setOffers((prev) => prev.filter((o) => o.id !== selectedOffer.id));
+      // Add to declined jobs with timestamp to prevent showing again for 10 seconds
+      setDeclinedJobIds((prev) => new Map(prev).set(selectedOffer.id, Date.now()));
+      setLastRejectionTime(Date.now());
+
       setSelectedOffer(null);
     } catch (error) {
       console.error("Failed to reject job:", error);
