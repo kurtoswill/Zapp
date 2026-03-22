@@ -14,9 +14,11 @@ import {
   Paintbrush,
   Truck,
   LogOut,
+  User,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import ServiceChip from "@/components/ServiceChip/ServiceChip";
+import ProfilePictureModal from "@/components/ProfilePictureModal/ProfilePictureModal";
 import styles from "./page.module.css";
 
 /* ------------------------------------------------------------------ */
@@ -65,7 +67,11 @@ export default function LandingPage() {
   const router = useRouter();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
+  const [userAvatar, setUserAvatar] = useState<string>("https://i.pravatar.cc/80?img=5");
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+
+  // Profile picture modal state
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   
   const [query, setQuery] = useState("");
   const [description, setDescription] = useState("");
@@ -102,21 +108,22 @@ export default function LandingPage() {
     const checkAuth = async () => {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        
+
         if (user) {
           setIsLoggedIn(true);
-          // Get user's name from profile
+          // Get user's name and avatar from profile
           const { data: profile, error: profileError } = await supabase
             .from("profiles")
-            .select("full_name")
+            .select("full_name, avatar_url")
             .eq("id", user.id)
             .single();
-          
+
           if (profileError) {
             console.warn("Could not fetch profile:", profileError);
           }
-          
+
           setUserName(profile?.full_name || user.email?.split("@")[0] || "User");
+          setUserAvatar(profile?.avatar_url || "https://i.pravatar.cc/80?img=5");
         } else {
           setIsLoggedIn(false);
         }
@@ -372,7 +379,51 @@ export default function LandingPage() {
     await supabase.auth.signOut();
     setIsLoggedIn(false);
     setUserName(null);
+    setUserAvatar("https://i.pravatar.cc/80?img=5");
     router.refresh();
+  };
+
+  /* ---- Upload profile picture ---- */
+  const handleUploadProfilePicture = async (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("bucket", "avatars");
+
+    // Step 1: Upload image to storage
+    const uploadResponse = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    const uploadData = await uploadResponse.json();
+
+    if (!uploadResponse.ok) {
+      throw new Error(uploadData.error || "Failed to upload image");
+    }
+
+    const imageUrl = uploadData.url;
+
+    // Step 2: Update profile with new avatar URL
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
+
+    const profileResponse = await fetch("/api/profile/avatar", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ avatar_url: imageUrl }),
+    });
+
+    const profileData = await profileResponse.json();
+
+    if (!profileResponse.ok) {
+      throw new Error(profileData.error || "Failed to update profile");
+    }
+
+    // Update local state
+    setUserAvatar(imageUrl);
   };
 
   /* ---- Request location ---- */
@@ -461,6 +512,17 @@ export default function LandingPage() {
         <header className={styles.topBar}>
           {isLoggedIn ? (
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
+              <button
+                className={styles.profileAvatarBtn}
+                onClick={() => setIsProfileModalOpen(true)}
+                aria-label="Change profile picture"
+              >
+                <img
+                  src={userAvatar}
+                  alt={userName || "Profile"}
+                  className={styles.profileAvatar}
+                />
+              </button>
               <span style={{ color: "#9ca3af", fontSize: "0.875rem" }}>
                 Hi, {userName}
               </span>
@@ -660,6 +722,15 @@ export default function LandingPage() {
           {isLoggedIn ? "Become a specialist" : "Sign in to continue"}
         </button>
       </section>
+
+      {/* Profile Picture Modal */}
+      <ProfilePictureModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        currentAvatar={userAvatar}
+        onUpload={handleUploadProfilePicture}
+        userName={userName || "user"}
+      />
     </main>
   );
 }
