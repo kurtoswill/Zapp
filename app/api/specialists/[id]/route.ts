@@ -37,7 +37,6 @@ export async function GET(
       user_id: string;
       profession: string | null;
       rating_avg: number | null;
-      total_reviews: number | null;
       jobs_completed: number | null;
       location_lat: number | null;
       location_lng: number | null;
@@ -96,7 +95,40 @@ export async function GET(
       .eq("id", data.user_id)
       .maybeSingle() as { data: { wallet_balance: number } | null; error: any };
 
-    // Merge specialist data with profile data
+    // Compute review count from reviews table (specialists table has no total_reviews column)
+    const { error: reviewCountError, count } = await supabase
+      .from('reviews')
+      .select('id', { count: 'exact', head: true })
+      .eq('reviewee_id', data.user_id);
+
+    if (reviewCountError) {
+      console.error('Failed to fetch reviews count:', reviewCountError);
+    }
+
+    // Recalculate average rating from all reviews for this user
+    let computedRating = data.rating_avg || 0;
+    const { data: reviewRows, error: reviewRowsError } = await supabase
+      .from<{ rating_value: number }>('reviews')
+      .select('rating_value')
+      .eq('reviewee_id', data.user_id);
+
+    if (reviewRowsError) {
+      console.error('Failed to fetch reviews for average rating:', reviewRowsError);
+    } else if (reviewRows && reviewRows.length > 0) {
+      const total = reviewRows.reduce((sum, row) => sum + (row.rating_value ?? 0), 0);
+      computedRating = total / reviewRows.length;
+
+      // Persist computed rating to specialists table (non-blocking)
+      const { error: ratingUpdateError } = await supabase
+        .from<SpecialistRow>('specialists')
+        .update({ rating_avg: computedRating })
+        .eq('user_id', data.user_id);
+
+      if (ratingUpdateError) {
+        console.error('Failed to persist computed specialist rating_avg:', ratingUpdateError);
+      }
+    }
+
     const specialist = {
       id: data.id,
       user_id: data.user_id,
@@ -109,8 +141,8 @@ export async function GET(
       municipality: data.profiles?.municipality || null,
       location_lat: data.location_lat || null,
       location_lng: data.location_lng || null,
-      rating: data.rating_avg || null,
-      reviews_count: data.total_reviews || 0,
+      rating: computedRating || 0,
+      reviews_count: count || 0,
       jobs_completed: data.jobs_completed || 0,
       rate: data.rate || null,
       min_rate: data.min_rate || null,

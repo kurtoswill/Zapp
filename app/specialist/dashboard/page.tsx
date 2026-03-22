@@ -457,6 +457,20 @@ export default function SpecialistDashboard() {
 
           if (reviewsError) console.warn('Error fetching reviews count:', reviewsError);
 
+          // compute average rating from all review rows directly in dashboard
+          let computedRating = 0;
+          const { data: reviewRows, error: reviewRowsError } = await supabase
+            .from('reviews')
+            .select('rating_value')
+            .eq('reviewee_id', user.id);
+
+          if (reviewRowsError) {
+            console.warn('Error fetching review rows for avg rating:', reviewRowsError);
+          } else if (reviewRows && reviewRows.length > 0) {
+            const totalScore = reviewRows.reduce((sum, row) => sum + (row.rating_value || 0), 0);
+            computedRating = totalScore / reviewRows.length;
+          }
+
           const { count: totalJobsAssigned, error: jobsAssignedError } = await supabase
             .from('jobs')
             .select('*', { count: 'exact', head: true })
@@ -465,47 +479,28 @@ export default function SpecialistDashboard() {
           if (jobsAssignedError) console.warn('Error fetching total jobs:', jobsAssignedError);
 
           const totalAssigned = totalJobsAssigned || 0;
-          const completionRate = totalAssigned > 0 ? (specialistRow.jobs_completed / totalAssigned) * 100 : 0;
+          // Keep this as a fallback; completion will be recalculated based on offers + completed jobs
+          const completionPercentageFromAssigned = totalAssigned > 0 ? (specialistRow.jobs_completed / totalAssigned) * 100 : 0;
 
-          // Response rate calculation
-          const { data: assignedJobs, error: assignedJobsError } = await supabase
+          // Response rate calculation: completed jobs vs rated/reviewed jobs
+          const { count: completedJobsCount, error: completedJobsError } = await supabase
             .from('jobs')
-            .select('id, created_at')
-            .eq('specialist_id', user.id) as { data: { id: string; created_at: string }[] | null; error: any };
+            .select('*', { count: 'exact', head: true })
+            .eq('specialist_id', user.id)
+            .eq('status', 'completed');
 
-          if (assignedJobsError) console.warn('Error fetching assigned jobs:', assignedJobsError);
+          if (completedJobsError) console.warn('Error fetching completed jobs count:', completedJobsError);
 
-          let quickResponses = 0;
-          if (assignedJobs && assignedJobs.length > 0) {
-            const jobIds = assignedJobs.map(j => j.id);
-            const { data: quotes, error: quotesError } = await supabase
-              .from('quotes')
-              .select('job_id, created_at')
-              .in('job_id', jobIds)
-              .eq('worker_id', specialistRow.id) as { data: { job_id: string; created_at: string }[] | null; error: any };
+          const completedCount = completedJobsCount || 0;
+          const ratedCount = reviewsCount || 0;
 
-            if (quotesError) console.warn('Error fetching quotes:', quotesError);
-
-            if (quotes) {
-              assignedJobs.forEach(job => {
-                const quote = quotes.find(q => q.job_id === job.id);
-                if (quote) {
-                  const jobTime = new Date(job.created_at).getTime();
-                  const quoteTime = new Date(quote.created_at).getTime();
-                  const diffHours = (quoteTime - jobTime) / (1000 * 60 * 60);
-                  if (diffHours <= 24) quickResponses++;
-                }
-              });
-            }
-          }
-
-          const responseRate = totalAssigned > 0 ? (quickResponses / totalAssigned) * 100 : 0;
+          const responseRate = completedCount > 0 ? (ratedCount / completedCount) * 100 : 0;
 
           // Total earned calculation - fetch actual wallet balance from worker_details
           const { data: walletData, error: walletError } = await supabase
             .from('worker_details')
             .select('wallet_balance')
-            .eq('user_id', specialistRow.user_id)
+            .eq('id', specialistRow.user_id)
             .maybeSingle() as { data: { wallet_balance: number } | null; error: any };
 
           if (walletError) console.warn('Error fetching wallet:', walletError);
@@ -518,9 +513,9 @@ export default function SpecialistDashboard() {
             name: specialistRow.profiles?.full_name || user.email?.split("@")[0] || "Specialist",
             avatar: specialistRow.profiles?.avatar_url || "https://i.pravatar.cc/80?img=5",
             role: specialistRow.profession || "General",
-            rating: specialistRow.rating_avg || 0,
+            rating: computedRating || specialistRow.rating_avg || 0,
             reviews: reviewsCount || 0,
-            completionRate: Math.round(completionRate),
+            completionRate: Math.round(completionPercentageFromAssigned),
             totalEarned: totalEarned,
             thisWeek: 0, // will be updated in fetchCompleted
             pending: 0,  // will be updated in fetchCompleted
@@ -677,6 +672,18 @@ export default function SpecialistDashboard() {
 
     if (specialist?.id) fetchCompleted();
   }, [specialist?.id]);
+
+  // Recalculate completion percentage as completed / (offers + completed)
+  useEffect(() => {
+    const offeredCount = offers.length;
+    const completedCount = completedJobs.length;
+    const totalCount = offeredCount + completedCount;
+    const computedCompletion = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+    setSpecialist((prev) =>
+      prev ? { ...prev, completionRate: computedCompletion } : prev
+    );
+  }, [offers.length, completedJobs.length]);
 
   // Auto-accept
   useEffect(() => {

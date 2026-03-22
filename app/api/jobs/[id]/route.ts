@@ -209,9 +209,9 @@ export async function PATCH(
         // ✅ Initialize worker_details when specialist accepts job
         const { data: specialist, error: specError } = await supabase
           .from('specialists')
-          .select('user_id')
+          .select('user_id, years_exp')
           .eq('id', specialist_id)
-          .single() as { data: { user_id: string } | null; error: any };
+          .single() as { data: { user_id: string; years_exp: string | null } | null; error: any };
 
         if (!specError && specialist?.user_id) {
           // Ensure worker_details record exists with initial 0 balance
@@ -220,6 +220,8 @@ export async function PATCH(
             .from('worker_details')
             .upsert({
               id: specialist.user_id,
+              user_id: specialist_id,
+              years_experience: specialist.years_exp ? parseInt(specialist.years_exp, 10) : 0,
               wallet_balance: 0
             }, { onConflict: 'id' });
         }

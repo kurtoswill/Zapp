@@ -1,6 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+type ReviewRow = {
+  id: string;
+  job_id: string;
+  reviewer_id: string;
+  reviewee_id: string;
+  rating_value: number;
+  comment?: string;
+  photos?: string[];
+  created_at?: string;
+};
+
+type SpecialistRow = {
+  id: string;
+  user_id: string;
+  rating_avg?: number;
+};
+
 // ============================================================
 // POST - Submit a review (customer rates worker after job)
 // ============================================================
@@ -27,7 +44,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert review into database
-    const { data, error } = await (supabase.from('reviews') as any)
+    const { data, error } = await supabase
+      .from<ReviewRow>('reviews')
       .insert({
         job_id,
         reviewer_id,
@@ -49,27 +67,19 @@ export async function POST(request: NextRequest) {
 
     // Update specialist's rating average in BOTH profiles and specialists tables
     const { data: reviews, error: reviewsError } = await supabase
-      .from('reviews')
+      .from<ReviewRow>('reviews')
       .select('rating_value')
-      .eq('reviewee_id', reviewee_id) as { data: { rating_value: number }[] | null; error: any };
+      .eq('reviewee_id', reviewee_id);
 
     if (!reviewsError && reviews && reviews.length > 0) {
       const avgRating = reviews.reduce((sum, r) => sum + r.rating_value, 0) / reviews.length;
       
-      // Update profiles table
-      const { error: profileUpdateError } = await (supabase.from('profiles') as any)
-        .update({ rating_avg: avgRating })
-        .eq('id', reviewee_id);
-      
-      if (profileUpdateError) {
-        console.error('Failed to update profile rating:', profileUpdateError);
-      }
-
-      // Update specialists table with rating_avg and total_reviews count
-      const { error: specUpdateError } = await (supabase.from('specialists') as any)
-        .update({ 
+      // Update specialists table with rating_avg.
+      // reviewee_id can be the auth user id (specialists.user_id), not specialists.id
+      const { error: specUpdateError } = await supabase
+        .from<SpecialistRow>('specialists')
+        .update({
           rating_avg: avgRating,
-          total_reviews: reviews.length 
         })
         .eq('user_id', reviewee_id);
       

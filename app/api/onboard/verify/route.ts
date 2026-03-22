@@ -203,6 +203,8 @@ export async function POST(request: NextRequest) {
       .upsert(
         {
           id: userId,
+          user_id: workerId,
+          years_experience: yearsExp ? parseInt(yearsExp, 10) : 0,
           wallet_balance: 0,
         },
         { onConflict: "id" }

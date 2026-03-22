@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+type JobRow = {
+  id: string;
+  customer_id: string;
+  profession: string;
+  description: string;
+  street_address: string;
+  province?: string;
+  municipality?: string;
+  barangay?: string;
+  landmarks?: string;
+  location_lat?: number;
+  location_lng?: number;
+  photos?: string[];
+  category_id?: string;
+  status: string;
+  created_at?: string;
+};
+
 // ============================================================
 // POST - Create a new job
 // ============================================================
@@ -32,7 +50,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert job into database
-    const { data: jobData, error } = await (supabase.from('jobs') as any)
+    const { data: jobData, error } = await supabase
+      .from<JobRow>('jobs')
       .insert({
         customer_id,
         profession,

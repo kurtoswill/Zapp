@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -34,12 +35,12 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Unauthorized: ID mismatch' }, { status: 403 });
         }
 
-        // 4. Get the Worker's ID
+        // 4. Get the Worker's ID and years experience
         const { data: specialist, error: specError } = await supabase
             .from('specialists')
-            .select('user_id')
+            .select('user_id, years_exp')
             .eq('id', job.specialist_id)
-            .single();
+            .single() as { data: { user_id: string; years_exp: string | null } | null; error: any };
 
         if (specError || !specialist) {
             return NextResponse.json({ error: 'Specialist record not found' }, { status: 404 });
@@ -58,10 +59,13 @@ export async function POST(request: NextRequest) {
             const newBalance = currentBalance + Number(amount);
 
             // Use UPSERT: This creates the row if it's missing, or updates it if it exists
-            const { error: walletError } = await supabase
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const { error: walletError } = await (supabase as any)
                 .from('worker_details')
                 .upsert({
                     id: specialist.user_id,
+                    user_id: job.specialist_id,
+                    years_experience: specialist.years_exp ? parseInt(specialist.years_exp, 10) : 0,
                     wallet_balance: newBalance
                 }, { onConflict: 'id' });
 

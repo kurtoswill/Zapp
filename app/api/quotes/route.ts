@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 
+type QuoteRow = {
+  id: string;
+  job_id: string;
+  worker_id: string;
+  proposed_rate: number;
+  estimated_arrival?: number;
+  status: string;
+  created_at?: string;
+};
+
 // ============================================================
 // POST - Submit a quote (specialist bids on a job)
 // ============================================================
@@ -19,7 +29,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Insert quote into database
-    const { data, error } = await (supabase.from('quotes') as any)
+    const { data, error } = await supabase
+      .from<QuoteRow>('quotes')
       .insert({
         job_id,
         worker_id,
