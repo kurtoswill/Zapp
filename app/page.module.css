@@ -55,29 +55,6 @@
 /* ----------------------------------------------------------------
    Top bar — avatar + location
    ---------------------------------------------------------------- */
-.profileAvatarBtn {
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  flex-shrink: 0;
-}
-
-.profileAvatar {
-  width: 36px;
-  height: 36px;
-  border-radius: var(--radius-full);
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  object-fit: cover;
-  object-position: center;
-  transition: border-color var(--duration-fast) var(--ease-out);
-}
-
-.profileAvatarBtn:hover .profileAvatar {
-  border-color: rgba(255, 255, 255, 0.6);
-}
-
 .signInBtn {
   background: rgba(255,255,255,0.12);
   border: 1px solid rgba(255,255,255,0.2);

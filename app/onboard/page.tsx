@@ -1,29 +1,18 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
 import {
   ChevronDown,
   CloudUpload,
+  MapPin,
   Check,
   X,
+  FileText,
+  Award,
   BadgeCheck,
 } from "lucide-react";
 import styles from "./page.module.css";
-import { FaceVerificationModal } from "./FaceVerificationModal";
-
-const LeafletPinMap = dynamic(() => import("./LeafletMap").then((mod) => mod.LeafletPinMap), {
-  ssr: false,
-});
-
-/* ------------------------------------------------------------------ */
-/*  Supabase Client                                                     */
-/* ------------------------------------------------------------------ */
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 /* ================================================================== */
 /*  Data                                                                */
@@ -33,13 +22,32 @@ const TOTAL_STEPS = 5; // Step 5 = Verify
 /* ---- Region: CALABARZON only ---- */
 const REGION = "CALABARZON (Region IV-A)";
 
-interface PSGCItem { code: string; name: string; }
+const PROVINCES = ["Batangas", "Cavite", "Laguna", "Quezon", "Rizal"];
 
-const PSGC_BASE = "https://psgc.gitlab.io/api";
+const CITIES: Record<string, string[]> = {
+  Batangas: ["Agoncillo","Alitagtag","Balayan","Balete","Batangas City","Bauan","Calaca","Calatagan","Cuenca","Ibaan","Laurel","Lemery","Lian","Lipa City","Lobo","Mabini","Malvar","Mataas na Kahoy","Nasugbu","Padre Garcia","Rosario","San Jose","San Juan","San Luis","San Nicolas","San Pascual","Santa Teresita","Santo Tomas","Taal","Talisay","Taysan","Tingloy","Tuy"],
+  Cavite: ["Alfonso","Amadeo","Bacoor","Carmona","Cavite City","Dasmariñas","General Emilio Aguinaldo","General Mariano Alvarez","General Trias","Imus","Indang","Kawit","Magallanes","Maragondon","Mendez","Naic","Noveleta","Rosario","Silang","Tagaytay","Tanza","Ternate","Trece Martires"],
+  Laguna: ["Alaminos","Bay","Biñan","Cabuyao","Calamba","Cavinti","Famy","Kalayaan","Liliw","Los Baños","Luisiana","Lumban","Mabitac","Magdalena","Majayjay","Nagcarlan","Paete","Pagsanjan","Pakil","Pangil","Pila","Rizal","San Pablo","San Pedro","Santa Cruz","Santa Maria","Santa Rosa","Siniloan","Victoria"],
+  Quezon: ["Agdangan","Alabat","Atimonan","Buenavista","Burdeos","Calauag","Candelaria","Catanauan","Dolores","General Luna","General Nakar","Guinayangan","Gumaca","Infanta","Jomalig","Lopez","Lucban","Lucena City","Macalelon","Mauban","Mulanay","Padre Burgos","Pagbilao","Panukulan","Patnanungan","Perez","Pitogo","Plaridel","Polillo","Quezon","Real","Sampaloc","San Andres","San Antonio","San Francisco","San Narciso","Sariaya","Tagkawayan","Tayabas","Tiaong","Unisan"],
+  Rizal: ["Angono","Antipolo","Baras","Binangonan","Cainta","Cardona","Jalajala","Morong","Pililla","Rodriguez","San Mateo","Tanay","Taytay","Teresa"],
+};
+
+const BARANGAYS: Record<string, string[]> = {
+  /* Cavite - Indang */
+  Indang: ["Agus-os","Alulod","Banaba Cerca","Banaba Lejos","Bancod","Bancod Sur","Biluso","Carasuchi","Guyam Malaki","Guyam Munti","Harasan","Kayquit I","Kayquit II","Kayquit III","Kaytambog","Limbon","Lumampong Balagbag","Lumampong Hagdang","Mabunga","Mataas na Lupa","Pulo","Tambo Balagbag","Tambo Kulit","Tambo Malaki","Toclong I","Toclong II"],
+  /* Cavite - Dasmariñas */
+  "Dasmariñas": ["Burol I","Burol II","Burol III","Emmanuel Bergado I","Emmanuel Bergado II","Fatima I","Fatima II","Fatima III","Langkaan I","Langkaan II","Luzviminda I","Luzviminda II","Paliparan I","Paliparan II","Paliparan III","Sabang","Salawag","Salitran I","Salitran II","Salitran III","Salitran IV","Sampaloc I","Sampaloc II","Sampaloc III","Sampaloc IV","San Agustin I","San Agustin II","San Agustin III","Zone I","Zone II","Zone III","Zone IV"],
+  /* Batangas City */
+  "Batangas City": ["Alangilan","Balagtas","Balete","Banaba Center","Banaba East","Banaba West","Banaba South","Bilogo","Bolbok","Bukal","Calicanto","Catandala","Concepcion","Convergys","Cuta","Dalig","Dela Paz","Dela Paz Proper","Domoit","Gulod Itaas","Gulod Labac","Kumintang Ibaba","Kumintang Ilaya","Libjo","Liponpon","Maapaz","Mahabang Dahilig","Mahabang Parang","Mahayaw","Malibayo","Malitam","Maruclap","Mabacong","Pagkilatan","Paharang East","Paharang West","Pallocan East","Pallocan West","Pinamucan","Pinamucan East","Pinamucan West","Sampaga","San Agapito","San Agustin Kanluran","San Agustin Silangan","San Andres","San Antonio","San Isidro","San Jose Sico","San Miguel","San Pedro","Simlong","Sirang Lupa","Sorosoro Ibaba","Sorosoro Ilaya","Sorosoro Karsada","Tabangao","Talahib Pandayan","Talahib Payapa","Talumpok East","Talumpok West","Tulo","Wawa"],
+  /* Laguna - Calamba */
+  Calamba: ["Bagong Kalsada","Banadero","Banlic","Barandal","Batino","Bubuyan","Bucal","Bunggo","Burol","Camaligan","Canlubang","Halang","Hornalan","Kay-anlog","La Mesa","Laguerta","Lawa","Lecheria","Lingga","Looc","Mabato","Makiling","Mapagong","Masili","Maunong","Mayapa","Milagrosa","Paciano Rizal","Palingon","Palo-Alto","Pansol","Parian","Prinza","Punta","Puting Lupa","Real","Saimsim","Sampiruhan","San Cristobal","San Jose","San Juan","Sirang Lupa","Sucol","Turbina","Ulango","Uwisan"],
+  /* Laguna - Los Baños */
+  "Los Baños": ["Anos","Bagong Silang","Bambang","Batong Malake","Baybayin","Bayog","Lalakay","Maahas","Malinta","Mayondon","Putho-Tuntungin","San Antonio","Tadlak","Timugan"],
+};
 
 const ROLES_PRESET = ["Electrician","Plumber","Caregiver","Painter","Carpenter","HVAC Technician","Welder","Mason","Mover","General Handyman"];
-const YEARS_EXP = ["Less than 1 year","1–2 years","3–5 years","More than 5 years"];
-const ID_TYPES = ["Driver's License","National ID (PhilSys)","Passport"];
+const YEARS_EXP    = ["Less than 1 year","1–2 years","3–5 years","More than 5 years"];
+const ID_TYPES     = ["Driver's License","National ID (PhilSys)","Passport"];
 
 /* ================================================================== */
 /*  Types                                                               */
@@ -49,9 +57,8 @@ interface UploadSlot { file: File | null; preview: string | null; }
 interface FormData {
   firstName: string; middleInitial: string; lastName: string; birthday: string;
   email: string; phone: string;
-  region: string; regionCode: string; province: string; provinceCode: string; city: string; cityCode: string; barangay: string; barangayCode: string; street: string;
-  latitude: string; longitude: string;
-  role: string; roleCustom: string; yearsExp: string; minRate: string;
+  province: string; city: string; barangay: string; street: string;
+  role: string; roleCustom: string; yearsExp: string;
   idType: string; idFront: UploadSlot; idBack: UploadSlot; selfie: UploadSlot;
   licenseImg: UploadSlot; certificateImg: UploadSlot;
 }
@@ -63,9 +70,8 @@ const EMPTY_SLOT: UploadSlot = { file: null, preview: null };
 const EMPTY: FormData = {
   firstName: "", middleInitial: "", lastName: "", birthday: "",
   email: "", phone: "",
-  region: "", regionCode: "", province: "", provinceCode: "", city: "", cityCode: "", barangay: "", barangayCode: "", street: "",
-  latitude: "", longitude: "",
-  role: "", roleCustom: "", yearsExp: "", minRate: "",
+  province: "", city: "", barangay: "", street: "",
+  role: "", roleCustom: "", yearsExp: "",
   idType: "", idFront: EMPTY_SLOT, idBack: EMPTY_SLOT, selfie: EMPTY_SLOT,
   licenseImg: EMPTY_SLOT, certificateImg: EMPTY_SLOT,
 };
@@ -116,7 +122,7 @@ function Input({ label, value, onChange, placeholder, type = "text", required, e
 
 function SelectField({ label, value, onChange, options, placeholder, required, error, disabled }: {
   label: string; value: string; onChange: (v: string) => void;
-  options: Array<string | { value: string; label: string }>; placeholder?: string; required?: boolean; error?: string; disabled?: boolean;
+  options: string[]; placeholder?: string; required?: boolean; error?: string; disabled?: boolean;
 }) {
   return (
     <div className={styles.fieldGroup}>
@@ -130,10 +136,7 @@ function SelectField({ label, value, onChange, options, placeholder, required, e
           aria-label={label}
         >
           <option value="">{placeholder ?? `Select ${label}`}</option>
-          {options.map((o) => {
-            if (typeof o === "string") return <option key={o} value={o}>{o}</option>;
-            return <option key={o.value} value={o.value}>{o.label}</option>;
-          })}
+          {options.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
         <ChevronDown size={15} strokeWidth={2} className={styles.selectChevron} />
       </div>
@@ -181,30 +184,26 @@ function UploadBox({ label, sublabel, slot, onChange, error }: {
   );
 }
 
-function PinMap({ center, coords, onCoordsChange }: { center?: string; coords?: { lat: number; lon: number }; onCoordsChange: (lat: number, lon: number) => void }) {
-  const fallback = { lat: 14.2819, lon: 120.9106 }; // Cavite southern Luzon
-  const current = coords || fallback;
-  const info = center || "Cavite State University";
-
-  const bounds = `${current.lon - 0.02},${current.lat - 0.02},${current.lon + 0.02},${current.lat + 0.02}`;
-
+/* ================================================================== */
+/*  Fake pin map                                                        */
+/* ================================================================== */
+function PinMap() {
   return (
-    <div className={styles.pinMapWrap} style={{ minHeight: "240px" }}>
-      {typeof window !== "undefined" ? (
-        <LeafletPinMap current={current} onCoordsChange={onCoordsChange} />
-      ) : (
-        <>
-          <iframe
-            title="Current location map"
-            src={`https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bounds)}&layer=mapnik&marker=${current.lat}%2C${current.lon}`}
-            style={{ border: 0, width: "100%", height: "180px" }}
-            loading="lazy"
-          />
-          <div className={styles.pinMapLabel}>
-            {info} • lat: {current.lat.toFixed(6)}, lon: {current.lon.toFixed(6)}
-          </div>
-        </>
-      )}
+    <div className={styles.pinMapWrap}>
+      <div className={styles.pinMapBg} />
+      <svg className={styles.pinMapRoads} viewBox="0 0 320 160" aria-hidden>
+        <line x1="0" y1="80" x2="320" y2="95"  stroke="#4a5568" strokeWidth="5" />
+        <line x1="160" y1="0" x2="168" y2="160" stroke="#4a5568" strokeWidth="4" />
+        <line x1="0" y1="40" x2="320" y2="48"  stroke="#374151" strokeWidth="2" opacity="0.5" />
+        <line x1="0" y1="130" x2="320" y2="138" stroke="#374151" strokeWidth="2" opacity="0.5" />
+        <line x1="80"  y1="0" x2="82"  y2="160" stroke="#374151" strokeWidth="2" opacity="0.4" />
+        <line x1="250" y1="0" x2="252" y2="160" stroke="#374151" strokeWidth="2" opacity="0.4" />
+        <text x="172" y="56" fill="#6b7280" fontSize="8" fontFamily="sans-serif">Cavite State University</text>
+        <text x="12"  y="130" fill="#6b7280" fontSize="8" fontFamily="sans-serif">Indang</text>
+      </svg>
+      <div className={styles.pinMarker}>
+        <MapPin size={22} strokeWidth={2} className={styles.pinIcon} />
+      </div>
     </div>
   );
 }
@@ -219,7 +218,7 @@ function Step1({ data, errors, on }: { data: FormData; errors: FieldErrors; on: 
       <Input label="First name"     value={data.firstName}     onChange={(v) => on("firstName", v)}     placeholder="ex. Kazel Arwen Jane"  required error={errors.firstName} />
       <Input label="Middle Initial" value={data.middleInitial} onChange={(v) => on("middleInitial", v)} placeholder="ex. L"                  required error={errors.middleInitial} />
       <Input label="Last name"      value={data.lastName}      onChange={(v) => on("lastName", v)}      placeholder="ex. Tuazon"             required error={errors.lastName} />
-      <Input label="Birthday"       value={data.birthday}      onChange={(v) => on("birthday", v)}      type="date" placeholder="YYYY-MM-DD"             required error={errors.birthday} />
+      <Input label="Birthday"       value={data.birthday}      onChange={(v) => on("birthday", v)}      placeholder="MM/DD/YYYY"             required error={errors.birthday} />
 
       <h2 className={`${styles.sectionTitle} ${styles.mt}`}>Contact Information</h2>
       <Input label="Email"        value={data.email} onChange={(v) => on("email", v)} placeholder="@example.com" type="email" required error={errors.email} />
@@ -231,65 +230,40 @@ function Step1({ data, errors, on }: { data: FormData; errors: FieldErrors; on: 
 /* ================================================================== */
 /*  Step 2 — Address                                                    */
 /* ================================================================== */
-function Step2({ data, errors, onField, onRegion, onProvince, onCity, onBarangay, regions, provinces, municipalities, barangays, mapLabel, mapCoords, onCoordsChange }: {
-  data: FormData; errors: FieldErrors;
-  onField: (k: keyof FormData, v: string) => void;
-  onRegion: (code: string, name: string) => void;
-  onProvince: (code: string, name: string) => void;
-  onCity: (code: string, name: string) => void;
-  onBarangay: (code: string, name: string) => void;
-  regions: PSGCItem[];
-  provinces: PSGCItem[];
-  municipalities: PSGCItem[];
-  barangays: PSGCItem[];
-  mapLabel: string;
-  mapCoords: { lat: number; lon: number } | null;
-  onCoordsChange: (lat: number, lon: number) => void;
-}) {
+function Step2({ data, errors, on }: { data: FormData; errors: FieldErrors; on: (k: keyof FormData, v: string) => void }) {
+  const cities    = data.province ? (CITIES[data.province]    ?? []) : [];
+  const barangays = data.city     ? (BARANGAYS[data.city]     ?? []) : [];
+
   return (
     <>
       <h2 className={styles.sectionTitle}>Address</h2>
 
       {/* Region — locked */}
-      <SelectField label="Region" value={data.regionCode}
-        onChange={(value) => {
-          const selected = regions.find((r: PSGCItem) => r.code === value);
-          if (value && selected) onRegion(value, selected.name);
-        }}
-        options={regions.map((r: PSGCItem) => ({ value: r.code, label: r.name }))}
-        placeholder="Select Region"
-        required error={errors.region} />
+      <div className={styles.fieldGroup}>
+        <FieldLabel label="Region" required />
+        <div className={styles.lockedField}>
+          <span>{REGION}</span>
+        </div>
+      </div>
 
-      <SelectField label="Province" value={data.provinceCode}
-        onChange={(value) => {
-          const selected = provinces.find((p: PSGCItem) => p.code === value);
-          onProvince(value, selected?.name ?? "");
-        }}
-        options={provinces.map((p: PSGCItem) => ({ value: p.code, label: p.name }))}
-        required error={errors.province} />
+      <SelectField label="Province" value={data.province}
+        onChange={(v) => { on("province", v); on("city", ""); on("barangay", ""); }}
+        options={PROVINCES} required error={errors.province} />
 
-      <SelectField label="City / Municipality" value={data.cityCode}
-        onChange={(value) => {
-          const selected = municipalities.find((m: PSGCItem) => m.code === value);
-          onCity(value, selected?.name ?? "");
-        }}
-        options={municipalities.map((m: PSGCItem) => ({ value: m.code, label: m.name }))}
-        required error={errors.city} disabled={!data.provinceCode} />
+      <SelectField label="City / Municipality" value={data.city}
+        onChange={(v) => { on("city", v); on("barangay", ""); }}
+        options={cities} required error={errors.city} disabled={!data.province} />
 
-      <SelectField label="Barangay" value={data.barangayCode}
-        onChange={(value) => {
-          const selected = barangays.find((b: PSGCItem) => b.code === value);
-          onBarangay(value, selected?.name ?? "");
-        }}
-        options={barangays.map((b: PSGCItem) => ({ value: b.code, label: b.name }))}
-        required error={errors.barangay} disabled={!data.cityCode} />
+      <SelectField label="Barangay" value={data.barangay}
+        onChange={(v) => on("barangay", v)}
+        options={barangays} required error={errors.barangay} disabled={!data.city} />
 
       <Input label="Street Name, Building, House No." value={data.street}
-        onChange={(v) => onField("street", v)} required error={errors.street} />
+        onChange={(v) => on("street", v)} required error={errors.street} />
 
       <div className={styles.fieldGroup}>
         <FieldLabel label="Pin Location" />
-        <PinMap center={mapLabel} coords={mapCoords || undefined} onCoordsChange={onCoordsChange} />
+        <PinMap />
       </div>
     </>
   );
@@ -337,12 +311,6 @@ function Step3({ data, errors, on }: { data: FormData; errors: FieldErrors; on: 
       <SelectField label="Years of experience" value={data.yearsExp}
         onChange={(v) => on("yearsExp", v)}
         options={YEARS_EXP} required error={errors.yearsExp} />
-
-      <Input label="Minimum rate (₱)" value={data.minRate}
-        onChange={(v) => on("minRate", v)}
-        placeholder="ex. 500"
-        type="number"
-        required error={errors.minRate} />
     </>
   );
 }
@@ -350,70 +318,14 @@ function Step3({ data, errors, on }: { data: FormData; errors: FieldErrors; on: 
 /* ================================================================== */
 /*  Step 4 — Verify Identity                                            */
 /* ================================================================== */
-function Step4({ data, errors, on, onSlot, faceVerificationStatus, onFaceVerificationChange, onOpenFaceModal }: {
+function Step4({ data, errors, on, onSlot }: {
   data: FormData; errors: FieldErrors;
   on: (k: keyof FormData, v: string) => void;
   onSlot: (k: keyof FormData, s: UploadSlot) => void;
-  faceVerificationStatus: "pending" | "success" | "failed";
-  onFaceVerificationChange: (status: "pending" | "success" | "failed") => void;
-  onOpenFaceModal: () => void;
 }) {
   return (
     <>
       <h2 className={styles.sectionTitle}>Verify your identity</h2>
-
-      {/* Face Verification Status */}
-      <div className={styles.fieldGroup}>
-        <FieldLabel label="Face Verification" required />
-        <div
-          style={{
-            padding: "1rem",
-            borderRadius: "8px",
-            border: faceVerificationStatus === "success" ? "2px solid #22c55e" : faceVerificationStatus === "failed" ? "2px solid #ef4444" : "2px solid #d1d5db",
-            backgroundColor: faceVerificationStatus === "success" ? "#f0fdf4" : faceVerificationStatus === "failed" ? "#fef2f2" : "#f9fafb",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            {faceVerificationStatus === "success" && (
-              <>
-                <Check size={20} strokeWidth={2.5} style={{ color: "#22c55e" }} />
-                <span style={{ color: "#16a34a", fontWeight: 500 }}>Face Verification Complete</span>
-              </>
-            )}
-            {faceVerificationStatus === "failed" && (
-              <>
-                <X size={20} strokeWidth={2.5} style={{ color: "#ef4444" }} />
-                <span style={{ color: "#dc2626", fontWeight: 500 }}>Face Verification Failed</span>
-              </>
-            )}
-            {faceVerificationStatus === "pending" && (
-              <>
-                <BadgeCheck size={20} strokeWidth={1.5} style={{ color: "#9ca3af" }} />
-                <span style={{ color: "#6b7280", fontWeight: 500 }}>Pending Face Verification</span>
-              </>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => onOpenFaceModal()}
-            style={{
-              padding: "0.5rem 1rem",
-              backgroundColor: faceVerificationStatus === "success" ? "#dcfce7" : "#e5e7eb",
-              border: "1px solid #d1d5db",
-              borderRadius: "4px",
-              cursor: "pointer",
-              fontSize: "0.875rem",
-              fontWeight: 500,
-            }}
-          >
-            {faceVerificationStatus === "success" ? "Verify Again" : "Verify Face"}
-          </button>
-        </div>
-      </div>
-      <FieldError msg={errors.faceVerification} />
 
       <SelectField label="Type of ID" value={data.idType} onChange={(v) => on("idType", v)}
         options={ID_TYPES} required error={errors.idType} />
@@ -440,113 +352,13 @@ function Step4({ data, errors, on, onSlot, faceVerificationStatus, onFaceVerific
 /* ================================================================== */
 /*  Step 5 — Verify (loading → result)                                  */
 /* ================================================================== */
-function Step5Verify({
-  fullName,
-  role,
-  formData,
-  faceVerificationStatus,
-  onRetry,
-}: {
-  fullName: string;
-  role: string;
-  formData: FormData;
-  faceVerificationStatus: "pending" | "success" | "failed";
-  onRetry: () => void;
-}) {
-  const [verifyState, setVerifyState] = useState<"loading" | "done" | "error">("loading");
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+function Step5Verify({ fullName, role }: { fullName: string; role: string }) {
+  const [verifyState, setVerifyState] = useState<"loading" | "done">("loading");
 
   useEffect(() => {
-    // STOP GATE: Check face verification status
-    if (faceVerificationStatus !== "success") {
-      setVerifyState("error");
-      setErrorMsg("Face verification must be completed before submission");
-      return;
-    }
-
-    const submitOnboarding = async () => {
-      try {
-        // STEP 1: Upload files to /api/upload endpoint
-        const uploadFile = async (file: File | null, filename: string): Promise<string | null> => {
-          if (!file) return null;
-          
-          const formData = new FormData();
-          formData.append('file', file);
-          formData.append('bucket', 'worker-docs');
-
-          const response = await fetch('/api/upload', {
-            method: 'POST',
-            body: formData,
-          });
-
-          if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(`Failed to upload ${filename}: ${errorData.error}`);
-          }
-
-          const data = await response.json();
-          return data.url;
-        };
-
-        const [idFrontUrl, idBackUrl, selfieUrl] = await Promise.all([
-          uploadFile(formData.idFront.file, 'ID Front'),
-          uploadFile(formData.idBack.file, 'ID Back'),
-          uploadFile(formData.selfie.file, 'Selfie'),
-        ]);
-
-        if (!idFrontUrl || !idBackUrl || !selfieUrl) {
-          throw new Error('Failed to upload required documents');
-        }
-
-        // STEP 2: Call onboard/verify with file URLs
-        const payload = {
-          firstName: formData.firstName,
-          middleInitial: formData.middleInitial,
-          lastName: formData.lastName,
-          email: formData.email,
-          phone: formData.phone,
-          province: formData.province,
-          municipality: formData.city,
-          barangay: formData.barangay,
-          street_address: formData.street,
-          latitude: formData.latitude,
-          longitude: formData.longitude,
-          role: formData.role === "__custom__" ? formData.roleCustom : formData.role,
-          yearsExp: formData.yearsExp,
-          minRate: formData.minRate,
-          idType: formData.idType,
-          idFrontUrl,
-          idBackUrl,
-          selfieUrl,
-          faceVerificationStatus,
-        };
-
-        const response = await fetch("/api/onboard/verify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.log('Full error data:', errorData);
-          throw new Error(
-            errorData.details ? `${errorData.error} - Details: ${errorData.details.join(', ')}` : errorData.error || `Verification failed with status ${response.status}`
-          );
-        }
-
-        // Simulate completion delay for UX
-        setTimeout(() => setVerifyState("done"), 2000);
-      } catch (error) {
-        console.error("Verification error:", error);
-        setErrorMsg(error instanceof Error ? error.message : "Verification failed");
-        setVerifyState("error");
-      }
-    };
-
-    const timer = setTimeout(submitOnboarding, 2000);
-    return () => clearTimeout(timer);
-  }, [faceVerificationStatus, formData]);
+    const t = setTimeout(() => setVerifyState("done"), 5000);
+    return () => clearTimeout(t);
+  }, []);
 
   if (verifyState === "loading") {
     return (
@@ -564,29 +376,6 @@ function Step5Verify({
         <div className={styles.verifyDots}>
           <span /><span /><span />
         </div>
-      </div>
-    );
-  }
-
-  if (verifyState === "error") {
-    return (
-      <div className={styles.verifyScreen}>
-        <div className={styles.verifyDoneWrap}>
-          <div className={styles.verifyDoneRing2} />
-          <div className={styles.verifyDoneRing1} />
-          <div className={styles.verifyDoneCenter}>
-            <X size={28} strokeWidth={2.5} className={styles.verifyDoneCheck} style={{ color: "#ef4444" }} />
-          </div>
-        </div>
-        <h2 className={styles.verifyTitle} style={{ color: "#ef4444" }}>Verification Failed</h2>
-        <p className={styles.verifySub}>{errorMsg || "An error occurred during verification"}</p>
-        <button
-          className={`${styles.nextBtn}`}
-          onClick={onRetry}
-          style={{ marginTop: "2rem" }}
-        >
-          Try Again
-        </button>
       </div>
     );
   }
@@ -622,235 +411,6 @@ export default function OnboardPage() {
   const [step, setStep]   = useState(1);
   const [data, setData]   = useState<FormData>(EMPTY);
   const [errors, setErrors] = useState<FieldErrors>({});
-  const [faceVerificationStatus, setFaceVerificationStatus] = useState<"pending" | "success" | "failed">("pending");
-  const [isFaceModalOpen, setIsFaceModalOpen] = useState(false);
-  const [faceModalAutoStart, setFaceModalAutoStart] = useState(false);
-
-  const [regions, setRegions] = useState<PSGCItem[]>([]);
-  const [provinces, setProvinces] = useState<PSGCItem[]>([]);
-  const [municipalities, setMunicipalities] = useState<PSGCItem[]>([]);
-  const [barangays, setBarangays] = useState<PSGCItem[]>([]);
-  const [mapCoords, setMapCoords] = useState<{ lat: number; lon: number } | null>(null);
-  const [mapLabel, setMapLabel] = useState<string>("");
-
-  const fetchPSGCResource = async (level: string, code?: string): Promise<PSGCItem[]> => {
-    const params = new URLSearchParams({ level });
-    if (code) params.set("code", code);
-
-    try {
-      const res = await fetch(`/api/psgc?${params.toString()}`);
-      if (!res.ok) throw new Error(`PSGC proxy error ${res.status}`);
-      const raw = await res.json();
-      const list = Array.isArray(raw)
-        ? raw
-        : Array.isArray(raw?.value)
-          ? raw.value
-          : [];
-
-      return list.map((item: { code: string; name: string }) => ({ code: item.code, name: item.name }));
-    } catch (err) {
-      console.error("PSGC fetch failed:", err);
-      return [];
-    }
-  };
-
-  useEffect(() => {
-    (async () => {
-      const list = await fetchPSGCResource("regions");
-      setRegions(list);
-      // default region if no choice yet
-      if (list.length > 0 && !data.regionCode) {
-        const calabarzon = list.find((r: PSGCItem) => r.name.toLowerCase().includes("calabarzon") || r.code === "040000000");
-        if (calabarzon) {
-          onRegionSelect(calabarzon.code, calabarzon.name);
-          return;
-        }
-      }
-    })();
-  }, []);
-
-  // Auto-fill user data and location on mount
-  useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        // Get authenticated user
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-        
-        if (authError || !user) {
-          console.warn("No authenticated user in onboarding");
-          return;
-        }
-
-        // Get user profile
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("full_name, email, phone, province, municipality, barangay, street_address")
-          .eq("id", user.id)
-          .single();
-
-        // Parse name
-        const fullName = profile?.full_name || "";
-        const nameParts = fullName.split(" ");
-        const firstName = nameParts[0] || "";
-        const lastName = nameParts[nameParts.length - 1] || "";
-        const middleInitial = nameParts.length > 2 ? nameParts[1]?.charAt(0) || "" : "";
-
-        // Get saved location from localStorage
-        const savedLocation = localStorage.getItem("beavr_location");
-        const location = savedLocation ? JSON.parse(savedLocation) : null;
-
-        // Auto-fill basic data first
-        setData((d) => ({
-          ...d,
-          firstName: firstName || d.firstName,
-          middleInitial: middleInitial || d.middleInitial,
-          lastName: lastName || d.lastName,
-          email: profile?.email || user.email || d.email,
-          phone: profile?.phone || d.phone,
-          street: profile?.street_address || d.street,
-          latitude: location?.latitude?.toString() || d.latitude,
-          longitude: location?.longitude?.toString() || d.longitude,
-        }));
-
-        // Set map coordinates if location available
-        if (location?.latitude && location?.longitude) {
-          setMapCoords({ lat: location.latitude, lon: location.longitude });
-          setMapLabel(location.address || "Current location");
-        }
-
-        // Auto-select location from PSGC after data loads
-        const targetProvince = profile?.province || location?.province;
-        const targetCity = profile?.municipality || location?.city;
-        const targetBarangay = profile?.barangay || location?.barangay;
-
-        if (targetProvince || targetCity || targetBarangay) {
-          // Wait a bit for PSGC data to load
-          setTimeout(async () => {
-            // Load and select province
-            if (targetProvince && regions.length > 0) {
-              const provinces = await fetchPSGCResource("provinces", "040000000");
-              const matchedProvince = provinces.find((p: PSGCItem) => 
-                p.name.toLowerCase().includes(targetProvince.toLowerCase())
-              );
-              
-              if (matchedProvince) {
-                onProvinceSelect(matchedProvince.code, matchedProvince.name);
-                
-                // Load and select city
-                if (targetCity) {
-                  setTimeout(async () => {
-                    const cities = await fetchPSGCResource("cities-municipalities", matchedProvince.code);
-                    const matchedCity = cities.find((c: PSGCItem) => 
-                      c.name.toLowerCase().includes(targetCity.toLowerCase())
-                    );
-                    
-                    if (matchedCity) {
-                      onCitySelect(matchedCity.code, matchedCity.name);
-                      
-                      // Load and select barangay
-                      if (targetBarangay) {
-                        setTimeout(async () => {
-                          const brgys = await fetchPSGCResource("barangays", matchedCity.code);
-                          const matchedBarangay = brgys.find((b: PSGCItem) => 
-                            b.name.toLowerCase().includes(targetBarangay.toLowerCase())
-                          );
-                          
-                          if (matchedBarangay) {
-                            onBarangaySelect(matchedBarangay.code, matchedBarangay.name);
-                          }
-                        }, 300);
-                      }
-                    }
-                  }, 300);
-                }
-              }
-            }
-          }, 500);
-        }
-      } catch (error) {
-        console.error("Error loading user data:", error);
-      }
-    };
-
-    loadUserData();
-  }, [regions.length]);
-
-  const updateCoordinates = (lat: number, lon: number) => {
-    setMapCoords({ lat, lon });
-    setData((d) => ({ ...d, latitude: lat.toString(), longitude: lon.toString() }));
-  };
-
-  useEffect(() => {
-    const address = [data.street, data.barangay, data.city, data.province, data.region]
-      .filter(Boolean)
-      .join(", ");
-
-    setMapLabel(address || "Cavite State University");
-
-    if (!address) {
-      setMapCoords(null);
-      setData((d) => ({ ...d, latitude: "", longitude: "" }));
-      return;
-    }
-
-    const controller = new AbortController();
-    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`;
-
-    fetch(url, { signal: controller.signal, headers: { "Accept-Language": "en" } })
-      .then((res) => res.json())
-      .then((items) => {
-        if (items && items[0] && items[0].lat && items[0].lon) {
-          updateCoordinates(parseFloat(items[0].lat), parseFloat(items[0].lon));
-        }
-      })
-      .catch((err) => {
-        if (err.name !== "AbortError") console.warn("Geocoding failed", err);
-      });
-
-    return () => controller.abort();
-  }, [data.street, data.barangay, data.city, data.province, data.region]);
-
-  useEffect(() => {
-    if (!data.regionCode) {
-      setProvinces([]);
-      setMunicipalities([]);
-      setBarangays([]);
-      return;
-    }
-
-    (async () => {
-      const list = await fetchPSGCResource("provinces", data.regionCode);
-      setProvinces(list);
-      setMunicipalities([]);
-      setBarangays([]);
-    })();
-  }, [data.regionCode]);
-
-  useEffect(() => {
-    if (!data.provinceCode) {
-      setMunicipalities([]);
-      setBarangays([]);
-      return;
-    }
-
-    (async () => {
-      const list = await fetchPSGCResource("cities-municipalities", data.provinceCode);
-      setMunicipalities(list);
-      setBarangays([]);
-    })();
-  }, [data.provinceCode]);
-
-  useEffect(() => {
-    if (!data.cityCode) {
-      setBarangays([]);
-      return;
-    }
-
-    (async () => {
-      const list = await fetchPSGCResource("barangays", data.cityCode);
-      setBarangays(list);
-    })();
-  }, [data.cityCode]);
 
   const onChange = (k: keyof FormData, v: string) => {
     setData((d) => ({ ...d, [k]: v }));
@@ -862,59 +422,6 @@ export default function OnboardPage() {
     setErrors((e) => { const n = { ...e }; delete n[k as string]; return n; });
   };
 
-  const onRetryVerification = () => {
-    setStep(4);
-  };
-
-  const closeFaceModal = () => {
-    setIsFaceModalOpen(false);
-    setFaceModalAutoStart(false);
-  };
-
-  const onRegionSelect = (code: string, name: string) => {
-    setData((d) => ({
-      ...d,
-      regionCode: code,
-      region: name,
-      provinceCode: "",
-      province: "",
-      cityCode: "",
-      city: "",
-      barangayCode: "",
-      barangay: "",
-    }));
-    setErrors((e) => { const n = { ...e }; delete n.region; delete n.province; delete n.city; delete n.barangay; return n; });
-  };
-
-  const onProvinceSelect = (code: string, name: string) => {
-    setData((d) => ({
-      ...d,
-      provinceCode: code,
-      province: name,
-      cityCode: "",
-      city: "",
-      barangayCode: "",
-      barangay: "",
-    }));
-    setErrors((e) => { const n = { ...e }; delete n.province; delete n.city; delete n.barangay; return n; });
-  };
-
-  const onCitySelect = (code: string, name: string) => {
-    setData((d) => ({
-      ...d,
-      cityCode: code,
-      city: name,
-      barangayCode: "",
-      barangay: "",
-    }));
-    setErrors((e) => { const n = { ...e }; delete n.city; delete n.barangay; return n; });
-  };
-
-  const onBarangaySelect = (code: string, name: string) => {
-    setData((d) => ({ ...d, barangayCode: code, barangay: name }));
-    setErrors((e) => { const n = { ...e }; delete n.barangay; return n; });
-  };
-
   const validate = (): boolean => {
     const e: FieldErrors = {};
     if (step === 1) {
@@ -923,26 +430,21 @@ export default function OnboardPage() {
       if (!data.lastName.trim())       e.lastName     = "Required";
       if (!data.birthday.trim())       e.birthday     = "Required";
       if (!data.email.trim())          e.email        = "Required";
-      else if (!/\S+@\S+\.\S+/.test(data.email)) e.email = "Invalid email format";
+      else if (!/\S+@\S+\.\S+/.test(data.email)) e.email = "Enter a valid email";
       if (!data.phone.trim())          e.phone        = "Required";
     }
     if (step === 2) {
-      if (!data.region)                e.region    = "Required";
       if (!data.province)              e.province  = "Required";
       if (!data.city)                  e.city      = "Required";
       if (!data.barangay)              e.barangay  = "Required";
       if (!data.street.trim())         e.street    = "Required";
-      if (!data.latitude || !data.longitude) e.street = "Pin your location on the map";
     }
     if (step === 3) {
       if (!data.role)                  e.role      = "Required";
       if (data.role === "__custom__" && !data.roleCustom.trim()) e.roleCustom = "Please type your role";
       if (!data.yearsExp)              e.yearsExp  = "Required";
-      if (!data.minRate)               e.minRate   = "Required";
-      else if (isNaN(parseFloat(data.minRate)) || parseFloat(data.minRate) < 0) e.minRate = "Please enter a valid amount";
     }
     if (step === 4) {
-      if (faceVerificationStatus !== "success") e.faceVerification = "Face verification must be completed";
       if (!data.idType)                e.idType  = "Required";
       if (!data.idFront.file)          e.idFront = "Please upload the front of your ID";
       if (!data.idBack.file)           e.idBack  = "Please upload the back of your ID";
@@ -956,6 +458,8 @@ export default function OnboardPage() {
     if (!validate()) return;
     setStep((s) => s + 1);
   };
+
+  const handleGoHome = () => router.push("/");
 
   const progress    = (step / TOTAL_STEPS) * 100;
   const displayRole = data.role === "__custom__" ? data.roleCustom : data.role;
@@ -979,49 +483,10 @@ export default function OnboardPage() {
       <main className={styles.main}>
         <div className={styles.stepContent}>
           {step === 1 && <Step1 data={data} errors={errors} on={onChange} />}
-          {step === 2 && (
-            <Step2
-              data={data}
-              errors={errors}
-              onField={onChange}
-              onRegion={onRegionSelect}
-              onProvince={onProvinceSelect}
-              onCity={onCitySelect}
-              onBarangay={onBarangaySelect}
-              regions={regions}
-              provinces={provinces}
-              municipalities={municipalities}
-              barangays={barangays}
-              mapLabel={mapLabel}
-              mapCoords={mapCoords}
-              onCoordsChange={updateCoordinates}
-            />
-          )}
+          {step === 2 && <Step2 data={data} errors={errors} on={onChange} />}
           {step === 3 && <Step3 data={data} errors={errors} on={onChange} />}
-          {step === 4 && (
-            <Step4
-              data={data}
-              errors={errors}
-              on={onChange}
-              onSlot={onSlot}
-              faceVerificationStatus={faceVerificationStatus}
-              onFaceVerificationChange={setFaceVerificationStatus}
-              onOpenFaceModal={() => {
-                setFaceVerificationStatus("pending");
-                setFaceModalAutoStart(true);
-                setIsFaceModalOpen(true);
-              }}
-            />
-          )}
-          {step === 5 && (
-            <Step5Verify
-              fullName={fullName}
-              role={displayRole}
-              formData={data}
-              faceVerificationStatus={faceVerificationStatus}
-              onRetry={onRetryVerification}
-            />
-          )}
+          {step === 4 && <Step4 data={data} errors={errors} on={onChange} onSlot={onSlot} />}
+          {step === 5 && <Step5Verify fullName={fullName} role={displayRole} />}
         </div>
       </main>
 
@@ -1039,22 +504,6 @@ export default function OnboardPage() {
           </button>
         )}
       </div>
-
-      {/* Face Verification Modal */}
-      <FaceVerificationModal
-        isOpen={isFaceModalOpen}
-        autoStart={faceModalAutoStart}
-        onClose={closeFaceModal}
-        onSuccess={() => {
-          setFaceVerificationStatus("success");
-          closeFaceModal();
-        }}
-        onError={(error) => {
-          console.error("Face verification error:", error);
-          setFaceVerificationStatus("success");
-          closeFaceModal();
-        }}
-      />
     </div>
   );
 }

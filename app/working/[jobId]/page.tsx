@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useParams } from "next/navigation";
 import {
   Zap,
   Clock,
@@ -19,42 +18,15 @@ import styles from "./page.module.css";
 /* ------------------------------------------------------------------ */
 type WorkStage = "working" | "done";
 
-interface Job {
-  id: string;
-  customer_id: string;
-  profession: string;
-  description: string;
-  street_address: string;
-  province: string | null;
-  municipality: string | null;
-  barangay: string | null;
-  landmarks: string | null;
-  location_lat: number | null;
-  location_lng: number | null;
-  photos: string[] | null;
-  status: string;
-  specialist_id: string | null;
-  created_at: string;
-  accepted_at: string | null;
-}
-
-interface Specialist {
-  id: string;
-  full_name: string | null;
-  email: string | null;
-  avatar_url: string | null;
-  phone: string | null;
-  role: string | null;
-  province: string | null;
-  municipality: string | null;
-  location_lat?: number | null;
-  location_lng?: number | null;
-  rating?: number;
-  reviews_count?: number;
-  jobs_completed?: number;
-  rate?: number;
-  min_rate?: number | null;
-}
+const WORKER = {
+  name:     "Kurt Oswill McCarver",
+  avatar:   "https://images.unsplash.com/photo-1621905251918-48416bd8575a?w=400&q=80",
+  role:     "Electrician",
+  rating:   4.2,
+  reviews:  203,
+  rate:     500,
+  currency: "₱",
+};
 
 const PAYMENT = {
   method:      "GCash",
@@ -63,6 +35,9 @@ const PAYMENT = {
   reference:   "807319",
   date:        new Date(2026, 2, 14, 14, 16), // 14 Mar 2026, 14:16
 };
+
+/** Simulated job duration in ms (10 s for demo) */
+const JOB_DURATION_MS = 10_000;
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                             */
@@ -164,7 +139,7 @@ function CodPendingModal({ onConfirmed }: { onConfirmed: () => void }) {
 /* ================================================================== */
 /*  Receipt modal                                                       */
 /* ================================================================== */
-function ReceiptModal({ onClose, rate, jobId }: { onClose: () => void; rate: number; jobId: string }) {
+function ReceiptModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [copied, setCopied] = useState(false);
 
@@ -203,7 +178,7 @@ function ReceiptModal({ onClose, rate, jobId }: { onClose: () => void; rate: num
         <div className={styles.receiptAmount}>
           <span className={styles.receiptCurrencyLabel}>PHP</span>
           <span className={styles.receiptAmountValue}>
-            ₱{rate.toLocaleString()}.00
+            {WORKER.currency}{WORKER.rate.toLocaleString()}.00
           </span>
         </div>
 
@@ -229,7 +204,7 @@ function ReceiptModal({ onClose, rate, jobId }: { onClose: () => void; rate: num
           <div className={styles.receiptRow}>
             <span className={styles.receiptLabel}>Work fee</span>
             <span className={styles.receiptValue}>
-              ₱{rate.toLocaleString()}
+              {WORKER.currency}{WORKER.rate.toLocaleString()}
             </span>
           </div>
 
@@ -259,7 +234,7 @@ function ReceiptModal({ onClose, rate, jobId }: { onClose: () => void; rate: num
         {/* CTA */}
         <button
           className={styles.receiptHomeBtn}
-          onClick={() => router.push(`/rate/${jobId}`)}
+          onClick={() => router.push("/rate/job-001")}
         >
           Rate your specialist
         </button>
@@ -272,117 +247,28 @@ function ReceiptModal({ onClose, rate, jobId }: { onClose: () => void; rate: num
 /*  Page                                                                */
 /* ================================================================== */
 export default function WorkingPage() {
-  const router = useRouter();
-  const params = useParams();
-  const jobId = params.jobId as string;
-
-  const [stage, setStage] = useState<WorkStage>("working");
-  const [job, setJob] = useState<Job | null>(null);
-  const [specialist, setSpecialist] = useState<Specialist | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const [elapsed, setElapsed] = useState(0);     // seconds
-  const [showReceipt, setShowReceipt] = useState(false);
+  const router                          = useRouter();
+  const [stage, setStage]               = useState<WorkStage>("working");
+  const [elapsed, setElapsed]           = useState(0);     // seconds
+  const [showReceipt, setShowReceipt]   = useState(false);
   const [showCodPending, setShowCodPending] = useState(false);
-  const [rate, setRate] = useState<number>(0);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const intervalRef                     = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  /* ------------------------------------------------------------------ */
-  /*  Data fetching                                                     */
-  /* ------------------------------------------------------------------ */
+  /* Simulate job completing after JOB_DURATION_MS */
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // Fetch job data
-        const jobResponse = await fetch(`/api/jobs/${jobId}`);
-        if (!jobResponse.ok) {
-          throw new Error(`Failed to fetch job: ${jobResponse.status}`);
-        }
-        const jobResult = await jobResponse.json();
-        const jobData = jobResult.job;
-        setJob(jobData);
-
-        // Fetch specialist data if job has specialist_id
-        if (jobData.specialist_id) {
-          const specialistResponse = await fetch(`/api/specialists/${jobData.specialist_id}`);
-          if (!specialistResponse.ok) {
-            throw new Error(`Failed to fetch specialist: ${specialistResponse.status}`);
-          }
-          const specialistResult = await specialistResponse.json();
-          const specialistData = specialistResult.specialist;
-          setSpecialist(specialistData);
-          
-          // Use min_rate from specialist if no quote exists
-          if (specialistData?.min_rate && specialistData.min_rate > 0) {
-            setRate(specialistData.min_rate);
-          }
-        }
-
-        // Fetch quote/rate for this job (quote rate takes precedence over min_rate)
-        const quoteResponse = await fetch(`/api/quotes?job_id=${jobId}`);
-        if (quoteResponse.ok) {
-          const quoteData = await quoteResponse.json();
-          if (quoteData.quotes && quoteData.quotes.length > 0) {
-            // Get the most recent quote — this overrides min_rate only if it's valid
-            const latestQuote = quoteData.quotes[0];
-            if (latestQuote.proposed_rate && latestQuote.proposed_rate > 0) {
-              setRate(latestQuote.proposed_rate);
-            }
-          }
-        }
-      } catch (err) {
-        console.error("Error fetching data:", err);
-        setError(err instanceof Error ? err.message : "Failed to load data");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (jobId) {
-      fetchData();
-    }
-  }, [jobId]);
-
-  /* Poll job status instead of using timer */
-  useEffect(() => {
-    const pollJobStatus = async () => {
-      try {
-        const res = await fetch(`/api/jobs/${jobId}`);
-        const result = await res.json();
-        const jobData = result.job;
-
-        if (jobData?.status === "completed") {
-          setStage("done");
-          if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-          }
-        }
-      } catch (error) {
-        console.error("Error polling job status:", error);
-      }
-    };
-
-    // Poll every 2 seconds
-    intervalRef.current = setInterval(pollJobStatus, 2000);
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-    };
-  }, [jobId]);
-
-  /* Timer for elapsed time display */
-  useEffect(() => {
-    const timer = setInterval(() => {
+    intervalRef.current = setInterval(() => {
       setElapsed((e) => e + 1);
     }, 1000);
 
-    return () => clearInterval(timer);
+    const done = setTimeout(() => {
+      clearInterval(intervalRef.current!);
+      setStage("done");
+    }, JOB_DURATION_MS);
+
+    return () => {
+      clearInterval(intervalRef.current!);
+      clearTimeout(done);
+    };
   }, []);
 
   const mins = Math.floor(elapsed / 60);
@@ -406,26 +292,6 @@ export default function WorkingPage() {
 
   return (
     <div className={styles.page}>
-      {loading && (
-        <div className={styles.loading}>
-          <div className={styles.spinnerWrap}>
-            <div className={styles.spinnerRing1} />
-            <div className={styles.spinnerRing2} />
-            <div className={styles.spinnerRing3} />
-          </div>
-          <p>Loading job details...</p>
-        </div>
-      )}
-
-      {error && (
-        <div className={styles.error}>
-          <p>Error: {error}</p>
-          <button onClick={() => window.location.reload()}>Retry</button>
-        </div>
-      )}
-
-      {!loading && !error && (
-        <>
 
       {/* Header */}
       <header className={styles.header}>
@@ -468,18 +334,18 @@ export default function WorkingPage() {
         {/* Worker card */}
         <div className={styles.workerCard}>
           <div className={styles.workerAvatar}>
-            <img src={specialist?.avatar_url || "/default-avatar.png"} alt={specialist?.full_name || "Specialist"} />
+            <img src={WORKER.avatar} alt={WORKER.name} />
           </div>
           <div className={styles.workerInfo}>
-            <span className={styles.workerName}>{specialist?.full_name || "Loading..."}</span>
-            <StarRating rating={specialist?.rating || 0} reviewCount={specialist?.reviews_count || 0} size={13} />
+            <span className={styles.workerName}>{WORKER.name}</span>
+            <StarRating rating={WORKER.rating} reviewCount={WORKER.reviews} size={13} />
             <div className={styles.workerRoleRow}>
               <Zap size={13} strokeWidth={2} className={styles.workerRoleIcon} />
-              <span className={styles.workerRole}>{specialist?.role || job?.profession || "Specialist"}</span>
+              <span className={styles.workerRole}>{WORKER.role}</span>
             </div>
           </div>
           <span className={styles.workerRate}>
-            ₱{rate.toLocaleString()}
+            {WORKER.currency}{WORKER.rate.toLocaleString()}
           </span>
         </div>
 
@@ -490,8 +356,8 @@ export default function WorkingPage() {
         <div className={styles.bottomBar}>
           <button className={styles.payBtn} onClick={handlePay}>
             {isCOD
-              ? `Pay ₱${rate.toLocaleString()} — Cash`
-              : `Pay ₱${rate.toLocaleString()} via ${PAYMENT.method}`}
+              ? `Pay ${WORKER.currency}${WORKER.rate.toLocaleString()} — Cash`
+              : `Pay ${WORKER.currency}${WORKER.rate.toLocaleString()} via ${PAYMENT.method}`}
           </button>
         </div>
       )}
@@ -503,9 +369,7 @@ export default function WorkingPage() {
 
       {/* Receipt modal */}
       {showReceipt && (
-        <ReceiptModal onClose={() => setShowReceipt(false)} rate={rate} jobId={jobId} />
-      )}
-        </>
+        <ReceiptModal onClose={() => setShowReceipt(false)} />
       )}
     </div>
   );
