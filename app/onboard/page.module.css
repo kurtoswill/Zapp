@@ -345,22 +345,6 @@
   height: 100%;
 }
 
-.pinMapLabel {
-  position: absolute;
-  bottom: 8px;
-  left: 12px;
-  right: 12px;
-  font-size: var(--text-xs-size);
-  color: var(--color-text-secondary);
-  background: rgba(15, 23, 42, 0.6);
-  border-radius: var(--radius-lg);
-  padding: 4px 8px;
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
 .pinMarker {
   position: absolute;
   top: 50%;
@@ -417,18 +401,6 @@
   background: var(--color-surface-subtle);
   border-color: var(--color-ink-40);
 }
-
-/* Leaflet map overrides */
-.leaflet-container {
-  border-radius: var(--radius-xl);
-  height: 100%;
-  width: 100%;
-}
-
-.leaflet-popup-content-wrapper {
-  border-radius: var(--radius-lg);
-}
-
 
 /* ================================================================
    Step 5 — Verify screen

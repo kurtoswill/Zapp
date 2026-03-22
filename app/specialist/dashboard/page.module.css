@@ -60,14 +60,6 @@
   flex-shrink: 0;
 }
 
-.heroAvatarButton {
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-
 .heroAvatar {
   width: 52px;
   height: 52px;
@@ -76,11 +68,6 @@
   object-fit: cover;
   object-position: center top;
   display: block;
-  transition: border-color var(--duration-fast) var(--ease-out);
-}
-
-.heroAvatarButton:hover .heroAvatar {
-  border-color: rgba(255,255,255,0.5);
 }
 
 /* Online status dot */
